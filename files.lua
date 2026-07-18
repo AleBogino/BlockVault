@@ -18,7 +18,7 @@ files.server = {
     { path = "server/auth.lua",         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/auth.lua"         },
     { path = "server/database.lua",     url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/database.lua"     },
     { path = "server/logger.lua",       url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/logger.lua"       },
-    { path = "server/master.lua",         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/main.lua"         },
+    { path = "server/main.lua",         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/main.lua"         },
     { path = "server/network.lua",      url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/network.lua"      },
     { path = "server/protocol.lua",     url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/protocol.lua"     },
     { path = "server/transactions.lua", url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/transactions.lua" },
@@ -26,7 +26,7 @@ files.server = {
 
 files.client = {
     { path = "client/config.lua",  url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/config.lua"  },
-    { path = "client/master.lua",    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/main.lua"    },
+    { path = "client/main.lua",    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/main.lua"    },
     { path = "client/network.lua", url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/network.lua" },
     { path = "client/protocol.lua",url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/protocol.lua"},
     { path = "client/setup.lua",   url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/setup.lua"   },
