@@ -94,9 +94,10 @@ end
 function ServerProtocol:onOperational(senderId, packetType, payload, session, send)
     local authResult, authErr = Auth.resolve(session)
 
-    -- CREATE_ACCOUNT is different, the rest get validated
+    -- CREATE_ACCOUNT and PING don't require an existing account
     local isCreateAccount = (packetType == constants.PACKET.CREATE_ACCOUNT)
-    if not authResult and not isCreateAccount then
+    local isPing = (packetType == constants.PACKET.PING)
+    if not authResult and not isCreateAccount and not isPing then
         local errCode = authErr or constants.ERROR.AUTH_FAILED
         self:_replyError(senderId, session, send, errCode)
         Logger.log(false, packetType, senderId, nil, errCode)

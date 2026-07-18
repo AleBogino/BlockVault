@@ -61,19 +61,22 @@ end
 function M.validate(packet)
     local ok, err = validateEnvelopeFields(packet)
     if not ok then return false, err end
- 
+
+    -- If the payload looks encrypted (has ciphertext + tag), treat it as an encrypted
+    if type(packet.payload) == "table"
+        and utils.isNonEmptyString(packet.payload.ciphertext)
+        and utils.isNonEmptyString(packet.payload.tag)
+    then
+        return true, nil
+    end
+
+    -- Plain payload: handshake packets must match their schema
     if constants.HANDSHAKE_PACKETS[packet.type] then
         return M.validatePayload(packet.type, packet.payload)
     end
 
-    -- packet isnt a handshake, packet must be encrypted
-    if type(packet.payload) ~= "table"
-        or not utils.isNonEmptyString(packet.payload.ciphertext)
-        or not utils.isNonEmptyString(packet.payload.tag)
-    then
-        return false, constants.ERROR.INVALID_PACKET
-    end
-    return true, nil
+    -- Not a handshake type and not encrypted then its INVALID
+    return false, constants.ERROR.INVALID_PACKET
 end
 
 --- Builds a new envelope table

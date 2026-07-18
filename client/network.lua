@@ -31,17 +31,28 @@ function M.send(recipientId, pkt)
 end
 
 
---- Blocks (timeout) seconds for one packet
---- @return table | nil pkt nil on timeout or malformed packet
+--- Blocks for up to (timeout) seconds, discarding invalid packets,
+--- and returns the first valid packet that passes validation.
+--- @return table | nil pkt nil on timeout or if no valid packet arrives
 function M.receiveOnce(timeout)
-    local senderId, pkt = rednet.receive(PROTOCOL, timeout)
-    if senderId == nil then return nil end
-    local ok, err = packet.validate(pkt)
-    if not ok then
-        print("[CLI-NET] Dropped invalid packet from " .. tostring(senderId) .. " type=" .. tostring(pkt and pkt.type) .. " reason=" .. tostring(err))
-        return nil
+    local deadline = os.epoch("utc") + (timeout or 10) * 1000
+    while true do
+        local remaining = math.max(0, math.ceil((deadline - os.epoch("utc")) / 1000))
+        if remaining <= 0 then
+            return nil
+        end
+        local senderId, pkt = rednet.receive(PROTOCOL, remaining)
+        if senderId == nil then
+            return nil
+        end
+        local ok, err = packet.validate(pkt)
+        if not ok then
+            print("[CLI-NET] Dropped invalid packet from " .. tostring(senderId) .. " type=" .. tostring(pkt and pkt.type) .. " reason=" .. tostring(err))
+            -- keep looping, discard noise
+        else
+            return pkt
+        end
     end
-    return pkt
 end
 
 --- Drives a ClientProtocol instance through a full handshake
