@@ -36,9 +36,9 @@ end
 -- ------------------------ CONFIG (SERVER OR CLIENT SETTING) ----------------------- --
 local NODE_TYPE = "client"
 
-downloadFile("https://raw.githubusercontent.com/alebogino/BlockVault/refs/heads/main/files.lua", "files")
+downloadFile("https://raw.githubusercontent.com/alebogino/BlockVault/refs/heads/master/files.lua", "files.lua")
 
-os.loadAPI("files")
+dofile("files.lua")
 
 -- Download shared files (needed by both client and server)
 for _, file in pairs(files.shared) do
