@@ -6,6 +6,7 @@ end
 
 local db        = require "server.database"
 local constants = require "shared.constants"
+local ccutil    = require "ccryptolib.util"
 
 local Auth = {}
 
@@ -22,9 +23,11 @@ function Auth.resolve(session)
         return nil, constants.ERROR.AUTH_FAILED
     end
 
+    local sessionPkHex = ccutil.toHex(session.peerPk)
+
     local accounts = db.listAccounts()
     for _, acct in ipairs(accounts) do
-        if acct.publicKey and acct.publicKey == session.peerPk then
+        if acct.publicKey and acct.publicKey == sessionPkHex then
             return {
                 account = acct,
                 permission = acct.permission or constants.PERMISSION.USER,
