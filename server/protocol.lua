@@ -71,7 +71,7 @@ function ServerProtocol:handlePacket(senderId, pkt, send)
 
     local session = self.sessions[senderId]
     if not session then
-        print("[SRV] No session for " .. tostring(senderId) .. " — sending AUTH_FAILED")
+        print("[SRV] No session for " .. tostring(senderId) .. " - sending AUTH_FAILED")
         send(senderId, self:_errorPacket(constants.ERROR.AUTH_FAILED))
         return
     end
@@ -92,7 +92,8 @@ end
 --- @param session Session authenticated session
 --- @param send function reply function (recipientId, packet)
 function ServerProtocol:onOperational(senderId, packetType, payload, session, send)
-    local authResult, authErr = Auth.resolve(session)
+    local targetUsername = payload.username or payload.from
+    local authResult, authErr = Auth.resolve(session, targetUsername)
 
     -- CREATE_ACCOUNT and PING don't require an existing account
     local isCreateAccount = (packetType == constants.PACKET.CREATE_ACCOUNT)
@@ -106,7 +107,7 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
     if isCreateAccount and not authResult then
         -- authResult is nil, handled by createAccount
     end
-    local username = authResult and authResult.account.username or nil
+    local username = authResult and authResult.account.username or targetUsername
 
     -- go forth, children
     local ok, result
@@ -220,7 +221,7 @@ function ServerProtocol:_handleAuth(senderId, pkt, send)
     self.sessions[senderId] = session
     self.pending[senderId] = nil
 
-    print("[SRV] Handshake COMPLETE with " .. tostring(senderId) .. " — session established")
+    print("[SRV] Handshake COMPLETE with " .. tostring(senderId) .. " - session established")
     local ok = packet.new(constants.PACKET.AUTH_OK, self.myId, crypto.randomBytes(12), utils.now(), {})
     ok.signature = signing.sign(self.mySk, self.myPk, ok)
     send(senderId, ok)

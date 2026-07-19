@@ -33,9 +33,6 @@ function Accounts.createAccount(payload, authResult, session)
     if not utils.isNonNegativeNumber(payload.initialBalance) then
         return false, constants.ERROR.INVALID_PACKET
     end
-    if not utils.isNonEmptyString(payload.publicKey) then
-        return false, constants.ERROR.INVALID_PACKET
-    end
     if not session then
         return false, constants.ERROR.AUTH_FAILED
     end
@@ -51,15 +48,13 @@ function Accounts.createAccount(payload, authResult, session)
     local record = {
         username = payload.username,
         balance = payload.initialBalance,
-        permission = constants.PERMISSION.USER,
-        publicKey = payload.publicKey
+        permission = constants.PERMISSION.USER
     }
 
     local ok, err = db.saveAccount(record)
     if not ok then
         return false, constants.ERROR.SERVER_ERROR
     end
-    db.saveKey(payload.username, payload.publicKey)
     return true, sanitiseAccount(db.getAccount(payload.username))
 end
 

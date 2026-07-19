@@ -7,6 +7,8 @@ M.PROTOCOL_VERSION = 1
 M.NONCE_TTL_MS = 30000
 -- how much clock skew between peers we tolerate
 M.CLOCK_SKEW_MS = 30000
+-- how far we detect the players
+M.PLAYER_DETECT_RANGE = 2
 
 M.PACKET = {
     -- handshake and auth
@@ -71,6 +73,8 @@ M.ERROR = {
     INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS",
     SERVER_ERROR = "SERVER_ERROR",
     INVALID_PACKET = "INVALID_PACKET",
+    PLAYER_NOT_FOUND = "PLAYER_NOT_FOUND",
+    PLAYER_TOO_FAR = "PLAYER_TOO_FAR"
 }
 
 -- payload schema
@@ -81,7 +85,7 @@ M.PAYLOAD_SCHEMA = {
     AUTH_OK = {},
     AUTH_FAIL = { "reason" },
 
-    CREATE_ACCOUNT = { "username", "initialBalance", "publicKey" },
+    CREATE_ACCOUNT = { "username", "initialBalance" },
     CREATE_ACCOUNT_OK = {},
     DELETE_ACCOUNT = { "username" },
     DELETE_ACCOUNT_OK = {},

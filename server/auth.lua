@@ -6,7 +6,7 @@ end
 
 local db        = require "server.database"
 local constants = require "shared.constants"
-local ccutil    = require "ccryptolib.util"
+local utils     = require "shared.utils"
 
 local Auth = {}
 
@@ -15,26 +15,28 @@ local Auth = {}
 --- @field permission string  "USER" | "ADMIN" | "SYSTEM"
 
 --- Map a session to an account
---- @param session table|nil Session object from protocol
+--- @param session  table|nil  Session object from protocol
+--- @param username string|nil The detected player username
 --- @return AuthResult|nil result
---- @return string|nil error (from constants.ERROR codes uwu)
-function Auth.resolve(session)
+--- @return string|nil error (from constants.ERROR codes)
+function Auth.resolve(session, username)
     if not session then
         return nil, constants.ERROR.AUTH_FAILED
     end
 
-    local sessionPkHex = ccutil.toHex(session.peerPk)
-
-    local accounts = db.listAccounts()
-    for _, acct in ipairs(accounts) do
-        if acct.publicKey and acct.publicKey == sessionPkHex then
-            return {
-                account = acct,
-                permission = acct.permission or constants.PERMISSION.USER,
-            }
-        end
+    if not utils.isNonEmptyString(username) then
+        return nil, constants.ERROR.PLAYER_NOT_FOUND
     end
-    return nil, constants.ERROR.ACCOUNT_NOT_FOUND
+
+    local acct = db.getAccount(username)
+    if not acct then
+        return nil, constants.ERROR.ACCOUNT_NOT_FOUND
+    end
+
+    return {
+        account = acct,
+        permission = acct.permission or constants.PERMISSION.USER,
+    }
 end
 
 --- @return AuthResult|nil

@@ -35,8 +35,8 @@ function M.verify(pk, msg, sig)
     return ed25519.verify(pk, msg, sig)
 end
 
--- X22519: TO EXCHANGE "DIFFIE-HEFFMAN" KEYS :)
--- generate a keypair for one handlshake, discarded as soon as the session is established
+-- X22519: TO EXCHANGE "DIFFIE-HELLMAN" KEYS :)
+-- generate a keypair for one handshake, discarded as soon as the session is established
 function M.newDHKeypair()
     local sk = random.random(32)
     local pk = x25519.publicKey(sk)

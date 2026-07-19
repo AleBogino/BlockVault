@@ -91,10 +91,28 @@ function UI.run(state)
     while true do
         print()
         header("BlockVault Client")
+
+        -- Detect nearest player
+        local playerDetector = require "shared.player_detector"
+        print("Scanning for nearby players (range: " ..
+            tostring(constants.PLAYER_DETECT_RANGE or 2) .. " blocks)...")
+        local detectedUsername = playerDetector.detectOrRetry(
+            state.playerDetector,
+            constants.PLAYER_DETECT_RANGE
+        )
+        if not detectedUsername then
+            print("Exiting.")
+            return
+        end
+
+        print()
+        print("Detected player: " .. detectedUsername)
+        hr()
         print("0. Test Connection (PING)")
-        print("1. Log in with username")
-        print("2. Create a new account")
-        print("3. Exit")
+        print("1. Log in as " .. detectedUsername)
+        print("2. Create a new account as " .. detectedUsername)
+        print("3. Re-scan for player")
+        print("4. Exit")
         print()
         print("Choose a number:")
 
@@ -109,44 +127,38 @@ function UI.run(state)
             end
             pause()
         elseif choice == "1" then
-            local username = readString("Username:")
-            if not username then
-                print("Invalid username.")
-            else
-                -- validate identity
-                local payload, err = sendAndReceive(state, constants.PACKET.GET_ACCOUNT, {
-                    username = username
-                })
+            -- Validate account exists
+            local payload, err = sendAndReceive(state, constants.PACKET.GET_ACCOUNT, {
+                username = detectedUsername
+            })
 
-                if not payload then
-                    print("Error: " .. tostring(err))
-                elseif not payload.success then
-                    local code = payload.code or "UNKNOWN"
-                    if code == constants.ERROR.ACCOUNT_NOT_FOUND then
-                        print("No account found with username '" .. username .. "'.")
-                        print("Use option 2 to create one.")
-                    elseif code == constants.ERROR.PERMISSION_DENIED then
-                        print("That account belongs to a different user.")
-                        print("You can only access your own account.")
-                    else
-                        print("Server error: " .. code)
-                    end
+            if not payload then
+                print("Error: " .. tostring(err))
+            elseif not payload.success then
+                local code = payload.code or "UNKNOWN"
+                if code == constants.ERROR.ACCOUNT_NOT_FOUND then
+                    print("No account found for '" .. detectedUsername .. "'.")
+                    print("Use option 2 to create one.")
+                elseif code == constants.ERROR.PERMISSION_DENIED then
+                    print("That account belongs to a different user.")
                 else
-                    local acct = payload.data
-                    print("Welcome, " .. acct.username .. "!")
-                    local perm = acct.permission or constants.PERMISSION.USER
-                    print("Permission: " .. perm)
-                    -- Enter the main menu loop; returns on logout
-                    UI.mainMenu(state, acct.username, perm)
+                    print("Server error: " .. code)
                 end
+            else
+                local acct = payload.data
+                print("Welcome, " .. acct.username .. "!")
+                local perm = acct.permission or constants.PERMISSION.USER
+                print("Permission: " .. perm)
+                UI.mainMenu(state, acct.username, perm)
             end
+            pause()
         elseif choice == "2" then
-            UI.createAccountScreen(state)
-
+            UI.createAccountScreen(state, detectedUsername)
         elseif choice == "3" then
+            -- Loop back to re-scan
+        elseif choice == "4" then
             print("Goodbye!")
             return
-
         else
             print("Invalid choice.")
         end
@@ -156,31 +168,20 @@ end
 -- ----------------------------- Create account ----------------------------- --
 
 --- First time account creation.
-function UI.createAccountScreen(state)
+function UI.createAccountScreen(state, detectedUsername)
     header("Create New Account")
-    print("You can only create an account if your identity")
-    print("is not already linked to one.")
-
-    local username = readString("Choose a username:")
-    if not username then
-        print("Account creation cancelled.")
-        return
-    end
+    print("Player: " .. detectedUsername)
+    print("New accounts start with $100 credits.")
+    print()
 
     -- New accounts always start with 100 credits
     local initialBalance = 100
 
-    local ccutil = require "ccryptolib.util"
-    local pkHex = ccutil.toHex(state.pk)
-
-    print("Your public key: " .. pkHex)
-    print("New accounts start with $" .. tostring(initialBalance) .. " credits.")
-    print("Creating account...")
+    print("Creating account for " .. detectedUsername .. "...")
 
     local payload, err = sendAndReceive(state, constants.PACKET.CREATE_ACCOUNT, {
-        username = username,
+        username = detectedUsername,
         initialBalance = initialBalance,
-        publicKey = pkHex
     })
 
     if not payload then
@@ -188,10 +189,10 @@ function UI.createAccountScreen(state)
     elseif not payload.success then
         local code = payload.code or "UNKNOWN"
         if code == "USERNAME_TAKEN" then
-            print("That username is already taken. Try another.")
-        elseif code == constants.ERROR.PERMISSION_DENIED then
-            print("You already have an account linked to your identity.")
-            print("Use option 1 to log in with your existing username.")
+            print("That username is already taken.")
+        elseif code == "ALREADY_HAS_ACCOUNT" then
+            print("You already have an account.")
+            print("Use option 1 to log in.")
         else
             print("Server error: " .. code)
         end
@@ -216,7 +217,7 @@ function UI.mainMenu(state, username, permission)
     local isAdmin = (permission == constants.PERMISSION.ADMIN or permission == constants.PERMISSION.SYSTEM)
     while true do
         print()
-        header("BlockVault — " .. username)
+        header("BlockVault - " .. username)
 
         print("1. Check Balance")
         print("2. Deposit")
@@ -317,7 +318,7 @@ function UI.depositScreen(state, username, permission)
     elseif not payload.success then
         local code = payload.code or "UNKNOWN"
         if code == constants.ERROR.PERMISSION_DENIED then
-            print("Permission denied — ADMIN or higher required.")
+            print("Permission denied - ADMIN or higher required.")
         elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
             print("Account '" .. target .. "' not found.")
         else
@@ -493,7 +494,7 @@ end
 function UI.adminMenu(state, username, permission)
     while true do
         print()
-        header("Admin Menu — " .. username)
+        header("Admin Menu - " .. username)
         print("1. Create Account (for another player)")
         print("2. Delete Account")
         print("3. Update Account (rename / change permission)")
