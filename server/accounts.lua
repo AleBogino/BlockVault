@@ -38,7 +38,7 @@ function Accounts.createAccount(payload, authResult, session)
     end
 
     if authResult then
-        return false, constants.ERROR.PERMISSION_DENIED
+        return false, "ALREADY_HAS_ACCOUNT"
     end
     local existing = db.getAccount(payload.username)
     if existing then

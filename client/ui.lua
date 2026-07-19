@@ -520,12 +520,6 @@ end
 
 function UI.adminCreateAccountScreen(state)
     header("Admin: Create Account")
-    print("Note: the server requires CREATE_ACCOUNT to be")
-    print("called by the *new user's own identity*.  If the")
-    print("server rejects this with PERMISSION_DENIED, have")
-    print("the player run this client themselves and use")
-    print("option 2 (Create Account) from the welcome screen.")
-    print()
 
     local username = readString("Username:")
     if not username then
@@ -534,16 +528,9 @@ function UI.adminCreateAccountScreen(state)
     end
     local initialBalance = 100
 
-    local pkHex = readString("User's public key (hex):")
-    if not pkHex or #pkHex == 0 then
-        print("Public key is required. Cancelled.")
-        return
-    end
-
     local payload, err = sendAndReceive(state, constants.PACKET.CREATE_ACCOUNT, {
         username = username,
         initialBalance = initialBalance,
-        publicKey = pkHex
     })
 
     if not payload then
@@ -552,8 +539,6 @@ function UI.adminCreateAccountScreen(state)
         local code = payload.code or "UNKNOWN"
         if code == "USERNAME_TAKEN" then
             print("Username '" .. username .. "' is already taken.")
-        elseif code == constants.ERROR.PERMISSION_DENIED then
-            print("Permission denied.  See the note above.")
         else
             print("Error: " .. code)
         end
