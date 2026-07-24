@@ -119,5 +119,9 @@ files.client = {{
     path = "client/ui/screens/withdraw.lua",
     url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/withdraw.lua"
 
+}, {
+    path = "client/ui/screens/rest.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/rest.lua"
+
 }}
 return files
