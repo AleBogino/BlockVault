@@ -79,6 +79,45 @@ files.client = {{
 }, {
     path = "client/ui.lua",
     url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui.lua"
-}}
+}, {
+    path = "client/ui/button.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/button.lua"
 
+}, {
+    path = "client/ui/keypad.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/keypad.lua"
+
+}, {
+    path = "client/ui/layout.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/layout.lua"
+
+}, {
+    path = "client/ui/net.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/net.lua"
+
+}, {
+    path = "client/ui/router.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/router.lua"
+
+}, {
+    path = "client/ui/screen_manager.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screen_manager.lua"
+
+}, {
+    path = "client/ui/screens/deposit.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/deposit.lua"
+
+}, {
+    path = "client/ui/screens/main_menu.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/main_menu.lua"
+
+}, {
+    path = "client/ui/screens/transfer.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/transfer.lua"
+
+}, {
+    path = "client/ui/screens/withdraw.lua",
+    url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/withdraw.lua"
+
+}}
 return files
