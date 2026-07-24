@@ -47,6 +47,26 @@ if not playerDetector then
     print("WARNING: No playerDetector peripheral found!")
 end
 
+-- Detect an Monitor
+local monitor = nil
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "monitor" then
+        local candidate = peripheral.wrap(name)
+        if candidate.isColor and candidate.isColor() then
+            monitor = candidate
+            print("Advanced monitor found: " .. name)
+            break
+        end
+    end
+end
+if not monitor then
+    error("No Monitor found! An Advanced Monitor is required for the ATM UI.")
+end
+
+monitor.setTextScale(0.5)
+monitor.setBackgroundColor(colors.black)
+monitor.clear()
+
 local function connect()
     print("Connecting to BlockVault server " .. serverInfo.serverId .. "...")
     local connected, hsErr = network.handshake(clientProtocol, 10)
@@ -78,7 +98,8 @@ local function main()
         serverId = serverInfo.serverId,
         serverPk = serverInfo.serverPk,
         connect = connect,
-        playerDetector = playerDetector
+        playerDetector = playerDetector,
+        monitor = monitor
     })
     if not ok then
         print("Unexpected error: " .. tostring(runErr))
