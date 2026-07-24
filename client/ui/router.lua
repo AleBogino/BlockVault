@@ -40,7 +40,7 @@ function Router.run(state, firstScreen)
         local event, p1, p2, p3 = os.pullEvent()
 
         if event == "monitor_touch" then
-            ScreenManager.dispatch(p1, p2)
+            ScreenManager.dispatch(p2, p3)
             resetInactivityTimer()
         elseif event == "timer" and p1 == inactivityTimer then
             -- Inactivity timeout: log out and return to rest screen
