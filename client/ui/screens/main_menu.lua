@@ -5,11 +5,6 @@ local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
 
-local Rest = require "client.ui.screens.rest"
-local Deposit = require "client.ui.screens.deposit"
-local Withdraw = require "client.ui.screens.withdraw"
-local Transfer = require "client.ui.screens.transfer"
-
 local MainMenu = {}
 
 --- Draw da screen
@@ -53,7 +48,7 @@ function MainMenu.draw(state, acct, message)
     -- Deposit button
     local depX = centerX - math.floor(btnW / 2)
     ScreenManager.register(Button.new(depX, row1, depX + btnW - 1, row1 + btnH - 1, "  Deposit   ", function()
-        Router.switch(Deposit, acct)
+        Router.switch(state.screens.deposit, acct)
     end, {
         bg = colors.green,
         fg = colors.white
@@ -62,7 +57,7 @@ function MainMenu.draw(state, acct, message)
     -- Transfer button
     local trX = depX + btnW + 2
     ScreenManager.register(Button.new(trX, row1, trX + btnW - 1, row1 + btnH - 1, " Transfer   ", function()
-        Router.switch(Transfer, acct)
+        Router.switch(state.screens.transfer, acct)
     end, {
         bg = colors.orange,
         fg = colors.white
@@ -72,7 +67,7 @@ function MainMenu.draw(state, acct, message)
     local witX = centerX - math.floor(btnW / 2)
     ScreenManager.register(Button.new(witX, row1 + btnH + 1, witX + btnW - 1, row1 + btnH + btnH, " Withdraw   ",
         function()
-            Router.switch(Withdraw, acct)
+            Router.switch(state.screens.withdraw, acct)
         end, {
             bg = colors.red,
             fg = colors.white
@@ -92,7 +87,7 @@ function MainMenu.draw(state, acct, message)
                 local pkt = session:send(constants.PACKET.DISCONNECT, state.myId, state.sk, state.pk, {})
                 state.network.send(state.serverId, pkt)
             end
-            Router.switch(Rest)
+            Router.switch(state.screens.rest)
         end, {
             bg = colors.gray,
             fg = colors.white
@@ -101,7 +96,7 @@ function MainMenu.draw(state, acct, message)
     -- Admin buttons
     if isAdmin then
         ScreenManager.register(Button.new(2, bottomY, 2 + logoutW, bottomY, "   Admin   ", function()
-            Router.switch(Deposit, acct)
+            Router.switch(state.screens.deposit, acct)
         end, {
             bg = colors.purple,
             fg = colors.white
