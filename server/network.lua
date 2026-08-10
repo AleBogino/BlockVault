@@ -85,9 +85,17 @@ function M.pumpOnce(protocolInstance, timeout)
 end
 
 function M.serveForever(protocolInstance)
+    print("[NET] serveForever: entering event loop. Rednet open=" .. tostring(rednet.isOpen()))
+    local eventCount = 0
     while true do
         local event = {os.pullEventRaw()}
         local eventName = event[1]
+        eventCount = eventCount + 1
+
+        -- Log every ~50 events or any non-timer/monitor events
+        if eventName ~= "timer" and eventName ~= "monitor_touch" then
+            print("[NET] Event #" .. tostring(eventCount) .. ": " .. tostring(eventName))
+        end
 
         if eventName == "rednet_message" then
             handleRednetMessage(protocolInstance, event[2], event[3], event[4])
