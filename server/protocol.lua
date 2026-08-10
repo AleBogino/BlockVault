@@ -44,7 +44,8 @@ function ServerProtocol.new(opts)
         nonceStore = opts.nonceStore or replay.new(constants.NONCE_TTL_MS),
         pending = {},
         pendingLogins = {},
-        sessions = {}
+        sessions = {},
+        playerDetector = opts.playerDetector,
     }, ServerProtocol)
 end
 
@@ -118,10 +119,11 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
     local targetUsername = payload.username or payload.from
     local authResult, authErr = Auth.resolve(session, targetUsername)
 
-    -- CREATE_ACCOUNT and PING don't require an existing account
+    -- CREATE_ACCOUNT, PING, and GET_ONLINE_PLAYERS don't require an existing account
     local isCreateAccount = (packetType == constants.PACKET.CREATE_ACCOUNT)
     local isPing = (packetType == constants.PACKET.PING)
-    if not authResult and not isCreateAccount and not isPing then
+    local isGetOnlinePlayers = (packetType == constants.PACKET.GET_ONLINE_PLAYERS)
+    if not authResult and not isCreateAccount and not isPing and not isGetOnlinePlayers then
         local errCode = authErr or constants.ERROR.AUTH_FAILED
         self:_replyError(senderId, session, send, errCode)
         Logger.log(false, packetType, senderId, nil, errCode)
@@ -157,6 +159,8 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
         ok, result = true, {
             echo = payload
         }
+    elseif packetType == constants.PACKET.GET_ONLINE_PLAYERS then
+        ok, result = self:_handleGetOnlinePlayers()
     else
         ok, result = false, constants.ERROR.INVALID_PACKET
     end
@@ -309,6 +313,25 @@ function ServerProtocol:_evictStaleSessions()
 end
 
 
+
+--- Query the server's playerDetector for online players
+--- @return boolean ok
+--- @return table|string result list of player names or error code
+function ServerProtocol:_handleGetOnlinePlayers()
+    if not self.playerDetector then
+        return false, constants.ERROR.SERVER_ERROR
+    end
+    local players = {}
+    local ok, list = pcall(function()
+        return self.playerDetector.getOnlinePlayers()
+    end)
+    if ok and type(list) == "table" then
+        for _, name in ipairs(list) do
+            table.insert(players, name)
+        end
+    end
+    return true, { players = players }
+end
 
 function ServerProtocol:_handleHello(senderId, pkt, send)
     print("[SRV] HELLO from " .. tostring(senderId))

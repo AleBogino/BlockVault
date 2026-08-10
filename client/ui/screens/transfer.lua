@@ -214,15 +214,13 @@ end
 --- @param message? string optional error banner
 function Transfer.draw(state, acct, message)
     local players = {}
-    if state.playerDetector then
-        local ok, list = pcall(function()
-            return state.playerDetector.getOnlinePlayers()
-        end)
-        if ok and type(list) == "table" then
-            for _, name in ipairs(list) do
-                table.insert(players, name)
-            end
+    local payload, err = Net.sendAndReceive(state, constants.PACKET.GET_ONLINE_PLAYERS, {})
+    if payload and payload.success and payload.data and payload.data.players then
+        for _, name in ipairs(payload.data.players) do
+            table.insert(players, name)
         end
+    else
+        -- If the request fails, show an empty list; the draw function handles it
     end
 
     drawRecipientStage(state, acct, players, 1, message)

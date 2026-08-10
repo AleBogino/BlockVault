@@ -11,6 +11,8 @@ M.CLOCK_SKEW_MS = 30000
 M.LOGIN_CHAT_TIMEOUT_MS = 30000
 -- login code length
 M.LOGIN_CODE_LENGTH = 4
+-- how long before an inactive session is evicted (ms)
+M.SESSION_TIMEOUT_MS = 120000
 
 M.PACKET = {
     -- handshake and auth
@@ -45,6 +47,10 @@ M.PACKET = {
     LOGIN_OK          = "LOGIN_OK",
     LOGIN_FAIL        = "LOGIN_FAIL",
     LOGIN_TIMEOUT     = "LOGIN_TIMEOUT",
+
+    -- Online players (server-side)
+    GET_ONLINE_PLAYERS     = "GET_ONLINE_PLAYERS",
+    GET_ONLINE_PLAYERS_OK  = "GET_ONLINE_PLAYERS_OK",
 }
 
 -- what do we tolerate before a session is established
@@ -131,6 +137,9 @@ M.PAYLOAD_SCHEMA = {
     LOGIN_OK         = { "username", "balance", "permission", "createdAt" },
     LOGIN_FAIL       = { "reason" },
     LOGIN_TIMEOUT    = {},
+
+    GET_ONLINE_PLAYERS     = {},
+    GET_ONLINE_PLAYERS_OK  = {},
 }
 
 return M

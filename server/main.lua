@@ -28,10 +28,24 @@ end
 print("Modem open. Listening for connections...")
 print("Chat command listener active. (.bvault)")
 
+-- Detect playerDetector for online player listing
+local playerDetector = nil
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "playerDetector" then
+        playerDetector = peripheral.wrap(name)
+        print("Player detector found: " .. name)
+        break
+    end
+end
+if not playerDetector then
+    print("WARNING: No playerDetector peripheral found! Online player list will be empty.")
+end
+
 local server = ServerProtocol.new({
     myId = os.getComputerID(),
     mySk = sk,
     myPk = pk,
+    playerDetector = playerDetector,
 })
  
 network.serveForever(server)
