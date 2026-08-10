@@ -17,10 +17,22 @@ local Accounts = require "server.accounts"
 local Transactions = require "server.transactions"
 local Logger = require "server.logger"
 
+-- Generate a random numeric login code
+local function generateLoginCode()
+    local digits = {}
+    for i = 1, constants.LOGIN_CODE_LENGTH do
+        digits[i] = tostring(math.random(0, 9))
+    end
+    return table.concat(digits)
+end
+
 local ServerProtocol = {}
 ServerProtocol.__index = ServerProtocol
 
 local HANDSHAKE_TTL_MS = 30000
+
+-- Session inactivity timeout (ms)
+local SESSION_TIMEOUT_MS = 120000
 
 --- @param opts table { myId, mySk, myPk, nonceStore?}
 function ServerProtocol.new(opts)
@@ -31,6 +43,7 @@ function ServerProtocol.new(opts)
         myPk = opts.myPk,
         nonceStore = opts.nonceStore or replay.new(constants.NONCE_TTL_MS),
         pending = {},
+        pendingLogins = {},
         sessions = {}
     }, ServerProtocol)
 end
@@ -63,6 +76,8 @@ function ServerProtocol:handlePacket(senderId, pkt, send)
             self:_handleHello(senderId, pkt, send)
         elseif pkt.type == constants.PACKET.AUTH then
             self:_handleAuth(senderId, pkt, send)
+        elseif pkt.type == constants.PACKET.LOGIN_REQUEST then
+            self:_handleLoginRequest(senderId, pkt, send)
         else
             send(senderId, self:_errorPacket(constants.ERROR.INVALID_PACKET))
         end
@@ -92,6 +107,14 @@ end
 --- @param session Session authenticated session
 --- @param send function reply function (recipientId, packet)
 function ServerProtocol:onOperational(senderId, packetType, payload, session, send)
+    -- expired logins go bye bye on every packet 
+    self:_evictExpiredLogins()
+
+    -- activity timestamp for session timeout
+    if session then
+        session.lastActivity = utils.now()
+    end
+    
     local targetUsername = payload.username or payload.from
     local authResult, authErr = Auth.resolve(session, targetUsername)
 
@@ -138,13 +161,10 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
         ok, result = false, constants.ERROR.INVALID_PACKET
     end
 
-
     -- Reply
     if ok then
         -- PING - PONG
-        local replyType = (packetType == constants.PACKET.PING)
-            and constants.PACKET.PONG
-            or (packetType .. "_OK")
+        local replyType = (packetType == constants.PACKET.PING) and constants.PACKET.PONG or (packetType .. "_OK")
         local reply = session:send(replyType, self.myId, self.mySk, self.myPk, {
             success = true,
             data = result
@@ -162,10 +182,132 @@ end
 function ServerProtocol:_replyError(senderId, session, send, code)
     local reply = session:send(constants.PACKET.ERROR, self.myId, self.mySk, self.myPk, {
         success = false,
-        code    = code,
+        code = code
     })
     send(senderId, reply)
 end
+
+--- handle chat login requests
+--- @param senderId number
+--- @param pkt table
+--- @param send function
+function ServerProtocol:_handleLoginRequest(senderId, pkt, send)
+    print("[SRV] LOGIN_REQUEST from " .. tostring(senderId))
+
+    -- already pending login?
+    for code, entry in pairs(self.pendingLogins) do
+        if entry.senderId == senderId then
+            -- Reuse the existing code
+            local reply = packet.new(constants.PACKET.LOGIN_AWAIT_CHAT, self.myId, crypto.randomBytes(12), utils.now(),
+                {
+                    code = code
+                })
+            reply.signature = signing.sign(self.mySk, self.myPk, reply)
+            send(senderId, reply)
+            return
+        end
+    end
+
+    -- otherwise generate a unique code
+    local code
+    repeat
+        code = generateLoginCode()
+    until not self.pendingLogins[code]
+
+    self.pendingLogins[code] = {
+        senderId = senderId,
+        createdAt = utils.now()
+    }
+
+    local reply = packet.new(constants.PACKET.LOGIN_AWAIT_CHAT, self.myId, crypto.randomBytes(12), utils.now(), {
+        code = code
+    })
+    reply.signature = signing.sign(self.mySk, self.myPk, reply)
+    send(senderId, reply)
+    print("[SRV] Login code " .. code .. " issued to client " .. tostring(senderId))
+end
+
+--- called on ".bvault login <code>"
+--- @param username string the player who sent the chat
+--- @param code string the login code from the chat message
+function ServerProtocol:onChatLogin(username, code)
+    print("[SRV] Chat login attempt: user=" .. tostring(username) .. " code=" .. tostring(code))
+
+    local entry = self.pendingLogins[code]
+    if not entry then
+        -- code not found or expired
+        print("[SRV] Login code " .. tostring(code) .. " not found in pending logins")
+        return
+    end
+
+    local senderId = entry.senderId
+    self.pendingLogins[code] = nil
+
+    local session = self.sessions[senderId]
+    if not session then
+        print("[SRV] No active session for client " .. tostring(senderId))
+        return
+    end
+
+    -- Look up the account
+    local db = require "server.database"
+    local acct = db.getAccount(username)
+
+    if acct then
+        -- Existing account: return account data
+        local reply = session:send(constants.PACKET.LOGIN_OK, self.myId, self.mySk, self.myPk, {
+            username = acct.username,
+            balance = acct.balance,
+            permission = acct.permission,
+            createdAt = acct.createdAt,
+            id = acct.id
+        })
+        -- Send via rednet
+        rednet.send(senderId, reply, "ccbank")
+        print("[SRV] LOGIN_OK sent to " .. tostring(senderId) .. " for user " .. username)
+    else
+        -- No account yet: tell user they're a dumb one
+        local reply = session:send(constants.PACKET.LOGIN_OK, self.myId, self.mySk, self.myPk, {
+            username = username,
+            balance = 0,
+            permission = constants.PERMISSION.USER,
+            createdAt = nil,
+            id = nil,
+            newAccount = true
+        })
+        rednet.send(senderId, reply, "ccbank")
+        print("[SRV] LOGIN_OK (new) sent to " .. tostring(senderId) .. " for user " .. username)
+    end
+end
+
+--- Evict expired pending logins
+function ServerProtocol:_evictExpiredLogins()
+    local cutoff = utils.now() - constants.LOGIN_CHAT_TIMEOUT_MS
+    for code, entry in pairs(self.pendingLogins) do
+        if entry.createdAt < cutoff then
+            -- Notify timeout to the client
+            local session = self.sessions[entry.senderId]
+            if session then
+                local timeoutPkt = session:send(constants.PACKET.LOGIN_TIMEOUT, self.myId, self.mySk, self.myPk, {})
+                rednet.send(entry.senderId, timeoutPkt, "ccbank")
+                print("[SRV] Login timeout for client " .. tostring(entry.senderId))
+            end
+            self.pendingLogins[code] = nil
+        end
+    end
+end
+
+--- Evict sessions that have been inactive too long
+function ServerProtocol:_evictStaleSessions()
+    local cutoff = utils.now() - constants.SESSION_TIMEOUT_MS
+    for id, session in pairs(self.sessions) do
+        if session.lastActivity and session.lastActivity < cutoff then
+            print("[SRV] Evicting stale session for client " .. tostring(id))
+            self.sessions[id] = nil
+        end
+    end
+end
+
 
 
 function ServerProtocol:_handleHello(senderId, pkt, send)
@@ -217,6 +359,7 @@ function ServerProtocol:_handleAuth(senderId, pkt, send)
     local session = Session.new(senderId, p.clientPk, s2c, c2s, function()
         return crypto.randomBytes(12)
     end)
+    session.lastActivity = utils.now()
 
     self.sessions[senderId] = session
     self.pending[senderId] = nil

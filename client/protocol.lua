@@ -25,7 +25,8 @@ function ClientProtocol.new(opts)
         serverId = opts.serverId,
         serverPk = opts.serverPk,
         state = "IDLE",
-        session = nil
+        session = nil,
+        loginState = nil,
     }, ClientProtocol)
 end
 
@@ -90,6 +91,61 @@ function ClientProtocol:handlePacket(pkt)
     else
     end
     return nil, nil
+end
+
+--- Send a login request to start the chat login
+--- @return table loginRequestPacket
+function ClientProtocol:sendLoginRequest()
+    if not self.session then
+        error("Cannot request login: no active session")
+    end
+    local pkt = self.session:send(
+        constants.PACKET.LOGIN_REQUEST,
+        self.myId, self.mySk, self.myPk,
+        { clientId = self.myId }
+    )
+    self.loginState = "WAIT_LOGIN_CODE"
+    return pkt
+end
+
+--- Process a packet during the login (post-handshake).
+--- @param pkt table the received packet
+--- @return table|nil replyPacket to send back
+--- @return string|nil loginCode if LOGIN_AWAIT_CHAT
+--- @return string|nil result   "LOGGED_IN", "LOGIN_FAIL", "LOGIN_TIMEOUT", or nil (in progress)
+--- @return table|nil accountData if LOGGED_IN
+function ClientProtocol:handleLoginPacket(pkt)
+    if tonumber(pkt.sender) ~= tonumber(self.serverId) then
+        return nil, nil, nil, nil
+    end
+
+    local payload, rerr = self.session:receive(pkt)
+    if not payload then
+        return nil, nil, "LOGIN_FAIL", nil
+    end
+
+    if pkt.type == constants.PACKET.LOGIN_AWAIT_CHAT and self.loginState == "WAIT_LOGIN_CODE" then
+        self.loginState = "WAIT_LOGIN_OK"
+        return nil, payload.code, nil, nil
+
+    elseif pkt.type == constants.PACKET.LOGIN_OK and self.loginState == "WAIT_LOGIN_OK" then
+        self.loginState = "LOGGED_IN"
+        return nil, nil, "LOGGED_IN", payload
+
+    elseif pkt.type == constants.PACKET.LOGIN_FAIL then
+        self.loginState = nil
+        return nil, nil, "LOGIN_FAIL", payload
+
+    elseif pkt.type == constants.PACKET.LOGIN_TIMEOUT then
+        self.loginState = nil
+        return nil, nil, "LOGIN_TIMEOUT", nil
+
+    elseif pkt.type == constants.PACKET.ERROR then
+        self.loginState = nil
+        return nil, nil, "LOGIN_FAIL", payload
+    end
+
+    return nil, nil, nil, nil
 end
 
 return ClientProtocol

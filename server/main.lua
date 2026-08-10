@@ -26,6 +26,7 @@ if not ok then
     error("network.open() failed: " .. tostring(err))
 end
 print("Modem open. Listening for connections...")
+print("Chat command listener active. (.bvault)")
 
 local server = ServerProtocol.new({
     myId = os.getComputerID(),

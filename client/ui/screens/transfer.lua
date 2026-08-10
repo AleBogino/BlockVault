@@ -28,7 +28,7 @@ local function drawRecipientStage(state, acct, players, page, message)
     -- header
     mon.setTextColor(colors.cyan)
     mon.setCursorPos(3, lay.headerRow)
-    mon.write("Transfer — Select Recipient")
+    mon.write("Transfer - Select Recipient")
 
     mon.setTextColor(colors.white)
     mon.setCursorPos(3, lay.headerRow + 1)

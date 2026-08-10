@@ -35,18 +35,6 @@ local clientProtocol = ClientProtocol.new({
     serverPk = serverInfo.serverPk
 })
 
-local playerDetector = nil
-for _, name in ipairs(peripheral.getNames()) do
-    if peripheral.getType(name) == "playerDetector" then
-        playerDetector = peripheral.wrap(name)
-        print("Player detector found: " .. name)
-        break
-    end
-end
-if not playerDetector then
-    print("WARNING: No playerDetector peripheral found!")
-end
-
 -- Detect an Monitor
 local monitor = nil
 for _, name in ipairs(peripheral.getNames()) do
@@ -98,8 +86,7 @@ local function main()
         serverId = serverInfo.serverId,
         serverPk = serverInfo.serverPk,
         connect = connect,
-        playerDetector = playerDetector,
-        monitor = monitor
+        monitor = monitor,
     })
     if not ok then
         print("Unexpected error: " .. tostring(runErr))

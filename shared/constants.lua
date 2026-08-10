@@ -7,8 +7,10 @@ M.PROTOCOL_VERSION = 1
 M.NONCE_TTL_MS = 30000
 -- how much clock skew between peers we tolerate
 M.CLOCK_SKEW_MS = 30000
--- how far we detect the players
-M.PLAYER_DETECT_RANGE = 2
+-- how long we wait for the player to enter the code in chat
+M.LOGIN_CHAT_TIMEOUT_MS = 30000
+-- login code length
+M.LOGIN_CODE_LENGTH = 4
 
 M.PACKET = {
     -- handshake and auth
@@ -36,6 +38,13 @@ M.PACKET = {
     PONG = "PONG",
     ERROR = "ERROR",
     DISCONNECT = "DISCONNECT",
+
+    -- login via chat
+    LOGIN_REQUEST     = "LOGIN_REQUEST",
+    LOGIN_AWAIT_CHAT  = "LOGIN_AWAIT_CHAT",
+    LOGIN_OK          = "LOGIN_OK",
+    LOGIN_FAIL        = "LOGIN_FAIL",
+    LOGIN_TIMEOUT     = "LOGIN_TIMEOUT",
 }
 
 -- what do we tolerate before a session is established
@@ -46,6 +55,11 @@ M.HANDSHAKE_PACKETS = {
     [M.PACKET.AUTH_OK] = true,
     [M.PACKET.AUTH_FAIL] = true,
     [M.PACKET.ERROR] = true,
+    [M.PACKET.LOGIN_REQUEST]    = true,
+    [M.PACKET.LOGIN_AWAIT_CHAT] = true,
+    [M.PACKET.LOGIN_OK]         = true,
+    [M.PACKET.LOGIN_FAIL]       = true,
+    [M.PACKET.LOGIN_TIMEOUT]    = true,
 }
 
 -- perms
@@ -74,7 +88,9 @@ M.ERROR = {
     SERVER_ERROR = "SERVER_ERROR",
     INVALID_PACKET = "INVALID_PACKET",
     PLAYER_NOT_FOUND = "PLAYER_NOT_FOUND",
-    PLAYER_TOO_FAR = "PLAYER_TOO_FAR"
+    PLAYER_TOO_FAR = "PLAYER_TOO_FAR",
+    LOGIN_TIMEOUT = "LOGIN_TIMEOUT",
+    ALREADY_PENDING = "ALREADY_PENDING",
 }
 
 -- payload schema
@@ -109,6 +125,12 @@ M.PAYLOAD_SCHEMA = {
     PONG = {},
     ERROR = { "code" },
     DISCONNECT = {},
+
+    LOGIN_REQUEST    = { "clientId" },
+    LOGIN_AWAIT_CHAT = { "code" },
+    LOGIN_OK         = { "username", "balance", "permission", "createdAt" },
+    LOGIN_FAIL       = { "reason" },
+    LOGIN_TIMEOUT    = {},
 }
 
 return M
