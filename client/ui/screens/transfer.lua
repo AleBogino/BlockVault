@@ -220,7 +220,7 @@ function Transfer.draw(state, acct, message)
             table.insert(players, name)
         end
     else
-        -- If the request fails, show an empty list; the draw function handles it
+        -- empty list
     end
 
     drawRecipientStage(state, acct, players, 1, message)

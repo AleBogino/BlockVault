@@ -119,16 +119,23 @@ function ClientProtocol:handleLoginPacket(pkt)
         return nil, nil, nil, nil
     end
 
+    -- LOGIN_AWAIT_CHAT is sent as a plain signed packet
+    if pkt.type == constants.PACKET.LOGIN_AWAIT_CHAT and self.loginState == "WAIT_LOGIN_CODE" then
+        if not signing.verify(self.serverPk, pkt) then
+            self.loginState = nil
+            return nil, nil, "LOGIN_FAIL", nil
+        end
+        self.loginState = "WAIT_LOGIN_OK"
+        return nil, pkt.payload.code, nil, nil
+    end
+
+    -- All other login packets are encrypted
     local payload, rerr = self.session:receive(pkt)
     if not payload then
         return nil, nil, "LOGIN_FAIL", nil
     end
 
-    if pkt.type == constants.PACKET.LOGIN_AWAIT_CHAT and self.loginState == "WAIT_LOGIN_CODE" then
-        self.loginState = "WAIT_LOGIN_OK"
-        return nil, payload.code, nil, nil
-
-    elseif pkt.type == constants.PACKET.LOGIN_OK and self.loginState == "WAIT_LOGIN_OK" then
+    if pkt.type == constants.PACKET.LOGIN_OK and self.loginState == "WAIT_LOGIN_OK" then
         self.loginState = "LOGGED_IN"
         return nil, nil, "LOGGED_IN", payload
 
