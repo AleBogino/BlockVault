@@ -27,13 +27,7 @@ function M.open()
 end
  
 function M.send(recipientId, pkt)
-    local rid = tonumber(recipientId)
-    local ok = rednet.send(rid, pkt, PROTOCOL)
-    if not ok then
-        print("[CLI-NET] ERROR: rednet.send to " .. tostring(rid) .. " FAILED (returned false)")
-    else
-        print("[CLI-NET] Sent packet type=" .. tostring(pkt and pkt.type) .. " to " .. tostring(rid) .. " proto=" .. PROTOCOL)
-    end
+    rednet.send(tonumber(recipientId), pkt, PROTOCOL)
 end
 
 
