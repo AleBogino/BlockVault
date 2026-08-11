@@ -85,32 +85,24 @@ function M.pumpOnce(protocolInstance, timeout)
 end
 
 function M.serveForever(protocolInstance)
-    print("[NET] serveForever: entering event loop. Rednet open=" .. tostring(rednet.isOpen()))
-    print("[NET] Protocol filter: " .. PROTOCOL)
-    local eventCount = 0
     while true do
-        local event = {os.pullEvent()}
-        local eventName = event[1]
-        eventCount = eventCount + 1
+        local ok, err = pcall(function()
+            while true do
+                local event = {os.pullEvent()}
+                local eventName = event[1]
 
-        -- Debug: log every event type
-        if eventName ~= "timer" and eventName ~= "monitor_touch" then
-            print("[NET] Event #" .. tostring(eventCount) .. ": " .. tostring(eventName) ..
-                (eventName == "modem_message" and (" side=" .. tostring(event[2]) .. " freq=" .. tostring(event[3])) or ""))
-        end
+                if eventName == "rednet_message" then
+                    handleRednetMessage(protocolInstance, event[2], event[3], event[4])
 
-        if eventName == "rednet_message" then
-            handleRednetMessage(protocolInstance, event[2], event[3], event[4])
-
-        elseif eventName == "modem_message" then
-            print("[NET] Raw modem_message — if rednet is open, a rednet_message should follow shortly")
-
-        elseif eventName == "chat" then
-            handleChatEvent(protocolInstance, event[2], event[3])
-
-        elseif eventName == "terminate" then
-            print("[NET] Terminate event received. Shutting down.")
-            break
+                elseif eventName == "chat" then
+                    handleChatEvent(protocolInstance, event[2], event[3])
+                end
+            end
+        end)
+        if not ok then
+            print("[NET] Event loop error: " .. tostring(err))
+            print("[NET] Restarting in 5 seconds...")
+            sleep(5)
         end
     end
 end
