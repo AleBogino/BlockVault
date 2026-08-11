@@ -86,24 +86,19 @@ end
 
 function M.serveForever(protocolInstance)
     print("[NET] serveForever: entering event loop. Rednet open=" .. tostring(rednet.isOpen()))
-    print("[NET] Protocol filter: " .. PROTOCOL)
     local eventCount = 0
     while true do
-        local event = {os.pullEvent()}
+        local event = {os.pullEventRaw()}
         local eventName = event[1]
         eventCount = eventCount + 1
 
-        -- Debug: log every event type
+        -- Log every ~50 events or any non-timer/monitor events
         if eventName ~= "timer" and eventName ~= "monitor_touch" then
-            print("[NET] Event #" .. tostring(eventCount) .. ": " .. tostring(eventName) ..
-                (eventName == "modem_message" and (" side=" .. tostring(event[2]) .. " freq=" .. tostring(event[3])) or ""))
+            print("[NET] Event #" .. tostring(eventCount) .. ": " .. tostring(eventName))
         end
 
         if eventName == "rednet_message" then
             handleRednetMessage(protocolInstance, event[2], event[3], event[4])
-
-        elseif eventName == "modem_message" then
-            print("[NET] Raw modem_message — if rednet is open, a rednet_message should follow shortly")
 
         elseif eventName == "chat" then
             handleChatEvent(protocolInstance, event[2], event[3])
