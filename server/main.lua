@@ -26,7 +26,11 @@ if not ok then
     error("network.open() failed: " .. tostring(err))
 end
 print("Modem open. Listening for connections...")
-print("Chat command listener active. (.bvault)")
+if network.chatBox then
+    print("Chat box detected. Chat login active. Players use: .bvault login <code>")
+else
+    print("WARNING: No chat box attached - chat login will not work.")
+end
 
 -- Detect playerDetector for online player listing
 local playerDetector = nil

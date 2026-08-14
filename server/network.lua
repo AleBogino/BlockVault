@@ -54,23 +54,48 @@ handleChatEvent = function(protocolInstance, message, username)
     return true
 end
 
+--- Find and wrap the chat box peripheral
+--- @return table|nil chatBox the wrapped peripheral
+--- @return string|nil side
+local function findChatBox()
+    for _, side in ipairs(peripheral.getNames()) do
+        local t = peripheral.getType(side)
+        if t then
+            local lt = string.lower(t)
+            if lt == "chat_box" or lt == "chatbox"
+                or lt:find(":chat_box", 1, true) or lt:find(":chatbox", 1, true) then
+                return peripheral.wrap(side), side
+            end
+        end
+    end
+    return nil, nil
+end
+
 --- OPEN THE GATES (the modem)
 --- @return boolean ok, string | nil err
 function M.open()
-    if rednet.isOpen() then
-        return true
-    end
-    local modemSide = nil
-    for _, side in ipairs(peripheral.getNames()) do
-        if peripheral.getType(side) == "modem" then
-            modemSide = side
-            break
+    if not rednet.isOpen() then
+        local modemSide = nil
+        for _, side in ipairs(peripheral.getNames()) do
+            if peripheral.getType(side) == "modem" then
+                modemSide = side
+                break
+            end
         end
+        if not modemSide then
+            return false, "no modem attached to this computer"
+        end
+        rednet.open(modemSide)
     end
-    if not modemSide then
-        return false, "no modem attached to this computer"
+
+    -- Detect the chat box used for chat-based login.
+    M.chatBox, M.chatBoxSide = findChatBox()
+    if M.chatBox then
+        print("[NET] Chat box found: " .. tostring(M.chatBoxSide))
+    else
+        print("[NET] WARNING: no chat box attached - .bvault login will not work")
     end
-    rednet.open(modemSide)
+
     return true
 end
 
@@ -93,7 +118,8 @@ function M.serveForever(protocolInstance)
             handleRednetMessage(protocolInstance, event[2], event[3], event[4])
 
         elseif eventName == "chat" then
-            handleChatEvent(protocolInstance, event[2], event[3])
+            -- Advanced Peripherals chat event: "chat", username, message, uuid, isHidden, messageUtf8
+            handleChatEvent(protocolInstance, event[3], event[2])
 
         elseif eventName == "terminate" then
             print("[NET] Terminate event received. Shutting down.")
