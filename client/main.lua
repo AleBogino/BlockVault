@@ -11,6 +11,9 @@ local ClientProtocol = require "client.protocol"
 local network = require "client.network"
 local constants = require "shared.constants"
 local ui = require "client.ui"
+local Peripheral = require "shared.peripheral"
+local Inventory = require "client.inventory"
+local ME = require "shared.me"
 
 crypto.initRandom()
 
@@ -55,6 +58,38 @@ monitor.setTextScale(0.5)
 monitor.setBackgroundColor(colors.black)
 monitor.clear()
 
+local cat = Peripheral.scan()
+
+-- barrel 4 da coins
+local inventoryMgr = nil
+local barrelName = Peripheral.first(cat.inventories)
+if barrelName then
+    local inv, invErr = Inventory.new(barrelName)
+    if inv then
+        inventoryMgr = inv
+        print("Deposit barrel: " .. tostring(barrelName))
+    else
+        print("WARNING: " .. tostring(invErr))
+    end
+else
+    print("WARNING: No inventory peripheral found - physical deposits disabled.")
+end
+
+-- ME bridge
+local meBridge = nil
+local meName = Peripheral.first(cat.meBridges)
+if meName then
+    meBridge = ME.wrap(meName)
+    if meBridge and ME.isConnected(meBridge) then
+        print("ME Bridge ready: " .. tostring(meName))
+    else
+        print("WARNING: ME Bridge not connected to an AE2 network: " .. tostring(meName))
+        meBridge = nil
+    end
+else
+    print("WARNING: No ME Bridge found - physical deposits disabled.")
+end
+
 local function connect()
     print("Connecting to BlockVault server " .. serverInfo.serverId .. "...")
     local connected, hsErr = network.handshake(clientProtocol, 10)
@@ -87,6 +122,8 @@ local function main()
         serverPk = serverInfo.serverPk,
         connect = connect,
         monitor = monitor,
+        inventoryMgr = inventoryMgr,
+        meBridge = meBridge
     })
     if not ok then
         print("Unexpected error: " .. tostring(runErr))

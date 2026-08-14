@@ -10,6 +10,7 @@ local identity = require "shared.identity"
 local ccutil = require "ccryptolib.util"
 local ServerProtocol = require "server.protocol"
 local network = require "server.network"
+local ServerME = require "server.me"
 
 crypto.initRandom()
 
@@ -51,5 +52,7 @@ local server = ServerProtocol.new({
     myPk = pk,
     playerDetector = playerDetector,
 })
+
+ServerME.init()
  
 network.serveForever(server)

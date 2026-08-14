@@ -6,6 +6,7 @@ local db = require "server.database"
 local constants = require "shared.constants"
 local utils = require "shared.utils"
 local Auth = require "server.auth"
+local ServerME = require "server.me"
 
 local Transactions = {}
 
@@ -40,13 +41,19 @@ end
 
 -- ---------------------------------- CRUD ---------------------------------- --
 
---- Deposit money into an account
---- ADMIN/SYSTEM only
---- @param payload table {username, amount}
+--- Deposit money into an account.
+--- USER: self-only physical coin deposit
+--- ADMIN/SYSTEM: numeric deposit
+--- @param payload table {username, amount, [coinBreakdown]}
 function Transactions.deposit(payload, authResult)
-    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.ADMIN)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.USER)
     if not resolved then
         return false, rerr
+    end
+
+    -- USER can only deposit into their own account
+    if resolved.permission == constants.PERMISSION.USER and payload.username ~= resolved.account.username then
+        return false, constants.ERROR.PERMISSION_DENIED
     end
 
     if not utils.isNonEmptyString(payload.username) then
@@ -54,6 +61,18 @@ function Transactions.deposit(payload, authResult)
     end
     if not utils.isNonNegativeNumber(payload.amount) or payload.amount <= 0 then
         return false, constants.ERROR.INVALID_PACKET
+    end
+
+    -- USER coins must be already on the network
+    if resolved.permission == constants.PERMISSION.USER then
+        local verified, verr = ServerME.verifyDeposit(payload.coinBreakdown)
+        if not verified then
+            return false, verr
+        end
+        -- The reported amount must be exactly backed
+        if verified < payload.amount then
+            return false, constants.ERROR.COINS_NOT_FOUND
+        end
     end
 
     -- Read
@@ -71,12 +90,14 @@ function Transactions.deposit(payload, authResult)
     end
 
     local tx = makeTxRecord("DEPOSIT", nil, payload.username, payload.amount, {
-        [payload.username] = acct.balance
+        [payload.username] = acct.balance,
+        coinBreakdown = payload.coinBreakdown,
     })
     db.appendTransaction(tx)
 
     return true, {
-        balance = acct.balance
+        balance = acct.balance,
+        deposited = payload.amount,
     }
 end
 

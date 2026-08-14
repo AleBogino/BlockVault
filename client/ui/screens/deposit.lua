@@ -1,93 +1,205 @@
--- Screen to deposit into a player's account (admin only for now)
-
 local Button = require "client.ui.button"
 local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Net = require "client.ui.net"
-local Keypad = require "client.ui.keypad"
 local constants = require "shared.constants"
+local ME = require "shared.me"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
 local Deposit = {}
+local PHASE = {
+    INSERT = "insert",
+    CONFIRM = "confirm"
+}
 
---- Draw it!
---- @param state   table shared state
---- @param acct    table current user account
---- @param target? string username to deposit into (nil = self)
---- @param message? string optional error/success banner
-function Deposit.draw(state, acct, target, message)
+local function shortName(coinId)
+    return coinId:match(":([^:]+)$") or coinId
+end
+
+local function drawInsert(state, acct, message)
     local mon = state.monitor
     local lay = state.layout
 
     mon.setBackgroundColor(colors.black)
     mon.clear()
 
-    -- header
-        mon.setTextColor(colors.cyan)
+    mon.setTextColor(colors.cyan)
     mon.setCursorPos(3, lay.headerRow)
     mon.write("Deposit")
 
-    local targetUser = target or acct.username
     mon.setTextColor(colors.white)
     mon.setCursorPos(3, lay.headerRow + 1)
-    mon.write("Into: " .. targetUser)
+    mon.write("Insert your coins into the barrel now.")
 
-    -- Message
     if message then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, lay.headerRow + 2)
+        mon.setCursorPos(2, lay.headerRow + 3)
         mon.write(message:sub(1, lay.width - 2))
     end
 
-    state.inputBuffer = ""
+    local btnW = 14
+    local bx = math.floor((lay.width - btnW) / 2) + 1
 
-    -- keypad
-    Keypad.draw(mon, lay, state, {
-        fieldLabel = "Amount",
-        onConfirm = function()
-            local amount = tonumber(state.inputBuffer)
-            if not amount or amount <= 0 then
-                Deposit.draw(state, acct, targetUser, "Invalid amount. Enter a positive number.")
+    ScreenManager.register(Button.new(bx, lay.confirmButtonRow - 2, bx + btnW - 1, lay.confirmButtonRow - 2,
+        "  Continue  ", function()
+            local inv = state.inventoryMgr
+            if not inv then
+                Deposit.draw(state, acct, PHASE.INSERT, "No barrel configured on this terminal.")
                 return
             end
-
-            local payload, err = Net.sendAndReceive(state, constants.PACKET.DEPOSIT, {
-                username = targetUser,
-                amount = amount,
-            })
-
-            if not payload then
-                Deposit.draw(state, acct, targetUser, "Network error: " .. tostring(err))
+            local total, breakdown, scanErr = inv:scan()
+            if scanErr then
+                Deposit.draw(state, acct, PHASE.INSERT, scanErr)
                 return
             end
+            Deposit.draw(state, acct, PHASE.CONFIRM, nil, breakdown, total)
+        end, {
+            bg = colors.green,
+            fg = colors.white
+        })):draw(mon)
 
-            if not payload.success then
-                local code = payload.code or "UNKNOWN"
-                local friendly
-                if code == constants.ERROR.PERMISSION_DENIED then
-                    friendly = "Permission denied — ADMIN or higher required."
-                elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
-                    friendly = "Account '" .. targetUser .. "' not found."
-                else
-                    friendly = "Error: " .. code
-                end
-                Deposit.draw(state, acct, targetUser, friendly)
-                return
-            end
-
-            -- Success!
-            local newBalance = payload.data.balance
-            local successMsg = "Deposit of $" .. tostring(amount)
-                .. " successful! New balance: $" .. tostring(newBalance)
-            -- Refresh account data
-            acct.balance = newBalance
-            Router.switch(MainMenu, acct, successMsg)
-        end,
-        onCancel = function()
+    ScreenManager.register(Button.new(bx, lay.confirmButtonRow, bx + btnW - 1, lay.confirmButtonRow, "  Back  ",
+        function()
             Router.switch(MainMenu, acct)
-        end,
-    })
+        end, {
+            bg = colors.gray,
+            fg = colors.white
+        })):draw(mon)
+end
+
+local function drawConfirm(state, acct, breakdown, total)
+    local mon = state.monitor
+    local lay = state.layout
+
+    mon.setBackgroundColor(colors.black)
+    mon.clear()
+
+    mon.setTextColor(colors.cyan)
+    mon.setCursorPos(3, lay.headerRow)
+    mon.write("Deposit - Review")
+
+    local y = lay.headerRow + 1
+    mon.setTextColor(colors.white)
+
+    if total <= 0 then
+        mon.setTextColor(colors.yellow)
+        mon.setCursorPos(3, y)
+        mon.write("No recognized coins found in the barrel.")
+        y = y + 1
+    else
+        mon.setCursorPos(3, y)
+        mon.write("Coins found:")
+        y = y + 1
+
+        for _, coinId in ipairs(constants.COIN_ORDER) do
+            local n = breakdown and breakdown[coinId]
+            if n and n > 0 then
+                local value = constants.COIN_VALUES[coinId] or 0
+                local line = ("%d x %s = %d units"):format(n, shortName(coinId), n * value)
+                mon.setCursorPos(3, y)
+                mon.write(line:sub(1, lay.width - 3))
+                y = y + 1
+            end
+        end
+
+        mon.setTextColor(colors.lime)
+        mon.setCursorPos(3, y)
+        mon.write(("Total: %d units"):format(total))
+        y = y + 1
+    end
+
+    mon.setTextColor(colors.white)
+    mon.setCursorPos(3, y)
+    mon.write(("Current balance: %d"):format(acct.balance or 0))
+    y = y + 1
+    mon.setCursorPos(3, y)
+    mon.write(("After deposit:   %d"):format((acct.balance or 0) + total))
+    y = y + 1
+
+    local available = state.inventoryMgr ~= nil and state.meBridge ~= nil
+    if not available then
+        mon.setTextColor(colors.red)
+        mon.setCursorPos(3, y)
+        mon.write("Physical deposits unavailable on this terminal.")
+        y = y + 1
+    end
+
+    local btnW = 14
+    local bx = math.floor((lay.width - btnW) / 2) + 1
+
+    if available and total > 0 then
+        ScreenManager.register(Button.new(bx, lay.confirmButtonRow - 2, bx + btnW - 1, lay.confirmButtonRow - 2,
+            "  Confirm  ", function()
+                local inv = state.inventoryMgr
+                local me = state.meBridge
+
+                -- 1) Import coins from barrel into the ME network
+                local imported, importedValue, importErrs = ME.importCoins(me, inv.name, breakdown)
+
+                if importedValue <= 0 then
+                    local why = "No coins were imported."
+                    if importErrs and next(importErrs) then
+                        why = "ME import failed."
+                    end
+                    Deposit.draw(state, acct, PHASE.INSERT, why)
+                    return
+                end
+
+                -- 2) Tell the server what was actually imported
+                local payload, err = Net.sendAndReceive(state, constants.PACKET.DEPOSIT, {
+                    username = acct.username,
+                    amount = importedValue,
+                    coinBreakdown = imported
+                })
+
+                if not payload then
+                    -- Rollback: return coins to the barrel
+                    ME.exportCoins(me, inv.name, imported)
+                    Deposit.draw(state, acct, PHASE.INSERT, "Network error - coins returned: " .. tostring(err))
+                    return
+                end
+
+                if not payload.success then
+                    -- Rollback: return coins to the barrel
+                    ME.exportCoins(me, inv.name, imported)
+                    local code = payload.code or "UNKNOWN"
+                    Deposit.draw(state, acct, PHASE.INSERT, "Deposit rejected (" .. code .. ") - coins returned.")
+                    return
+                end
+
+                -- 3) Success
+                local newBalance = payload.data and payload.data.balance or acct.balance
+                acct.balance = newBalance
+                Router.switch(MainMenu, acct, ("Deposited %d units. New balance: %d"):format(importedValue, newBalance))
+            end, {
+                bg = colors.green,
+                fg = colors.white
+            })):draw(mon)
+    end
+
+    ScreenManager.register(Button.new(bx, lay.confirmButtonRow, bx + btnW - 1, lay.confirmButtonRow, "  Cancel  ",
+        function()
+            Deposit.draw(state, acct, PHASE.INSERT)
+        end, {
+            bg = colors.gray,
+            fg = colors.white
+        })):draw(mon)
+end
+
+--- @param state table shared state (needs .inventoryMgr and .meBridge)
+--- @param acct table current account
+--- @param phase? string PHASE.INSERT | PHASE.CONFIRM (defaults to INSERT)
+--- @param message? string banner text (INSERT phase)
+--- @param breakdown? table { [coinId] = count } (CONFIRM phase)
+--- @param total? number total value (CONFIRM phase)
+function Deposit.draw(state, acct, phase, message, breakdown, total)
+    phase = phase or PHASE.INSERT
+    if phase == PHASE.CONFIRM then
+        drawConfirm(state, acct, breakdown, total)
+    else
+        drawInsert(state, acct, message)
+    end
 end
 
 return Deposit

@@ -81,6 +81,27 @@ M.PERMISSION_RANK = {
     SYSTEM = 3,
 }
 
+-- Coin values
+M.COIN_VALUES = {
+    ["createdeco:zinc_coin"]            = 1,
+    ["createdeco:copper_coin"]          = 9,
+    ["createdeco:iron_coin"]            = 81,
+    ["createdeco:industrial_iron_coin"] = 729,
+    ["createdeco:brass_coin"]           = 6561,
+    ["createdeco:gold_coin"]            = 59049,
+    ["createdeco:netherite_coin"]       = 531441,
+}
+-- import order
+M.COIN_ORDER = {
+    "createdeco:netherite_coin",
+    "createdeco:gold_coin",
+    "createdeco:brass_coin",
+    "createdeco:industrial_iron_coin",
+    "createdeco:iron_coin",
+    "createdeco:copper_coin",
+    "createdeco:zinc_coin",
+}
+
 -- error codes
 M.ERROR = {
     INVALID_SIGNATURE = "INVALID_SIGNATURE",
@@ -97,6 +118,11 @@ M.ERROR = {
     PLAYER_TOO_FAR = "PLAYER_TOO_FAR",
     LOGIN_TIMEOUT = "LOGIN_TIMEOUT",
     ALREADY_PENDING = "ALREADY_PENDING",
+    NO_ME_BRIDGE = "NO_ME_BRIDGE",
+    ME_NOT_CONNECTED = "ME_NOT_CONNECTED",
+    ME_IMPORT_FAILED = "ME_IMPORT_FAILED",
+    COINS_NOT_FOUND = "COINS_NOT_FOUND",
+    NO_INVENTORY = "NO_INVENTORY",
 }
 
 -- payload schema
