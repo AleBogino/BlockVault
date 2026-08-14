@@ -1,6 +1,5 @@
 -- Server entry point
 -- Prerequisites: tools/install-ccryptolib.lua has been run, and a wireless modem is attached
-
 if not package.path:find("^/%?%.lua;", 1) then
     package.path = "/?.lua;/?/init.lua;" .. package.path
 end
@@ -50,9 +49,9 @@ local server = ServerProtocol.new({
     myId = os.getComputerID(),
     mySk = sk,
     myPk = pk,
-    playerDetector = playerDetector,
+    playerDetector = playerDetector
 })
 
 ServerME.init()
- 
+
 network.serveForever(server)

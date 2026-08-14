@@ -134,13 +134,14 @@ local function drawConfirm(state, acct, breakdown, total)
                 local inv = state.inventoryMgr
                 local me = state.meBridge
 
-                -- 1) Import coins from barrel into the ME network
-                local imported, importedValue, importErrs = ME.importCoins(me, inv.name, breakdown)
+                -- 1) Import coins from the barrel (adjacent to the ME Bridge on state.meSide)
+                local imported, importedValue, importErrs = ME.importCoins(me, state.meSide, breakdown)
 
                 if importedValue <= 0 then
                     local why = "No coins were imported."
                     if importErrs and next(importErrs) then
-                        why = "ME import failed."
+                        local firstCoin = next(importErrs)
+                        why = "ME import failed: " .. tostring(importErrs[firstCoin])
                     end
                     Deposit.draw(state, acct, PHASE.INSERT, why)
                     return
@@ -155,14 +156,14 @@ local function drawConfirm(state, acct, breakdown, total)
 
                 if not payload then
                     -- Rollback: return coins to the barrel
-                    ME.exportCoins(me, inv.name, imported)
+                    ME.exportCoins(me, state.meSide, imported)
                     Deposit.draw(state, acct, PHASE.INSERT, "Network error - coins returned: " .. tostring(err))
                     return
                 end
 
                 if not payload.success then
                     -- Rollback: return coins to the barrel
-                    ME.exportCoins(me, inv.name, imported)
+                    ME.exportCoins(me, state.meSide, imported)
                     local code = payload.code or "UNKNOWN"
                     Deposit.draw(state, acct, PHASE.INSERT, "Deposit rejected (" .. code .. ") - coins returned.")
                     return

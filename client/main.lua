@@ -123,7 +123,8 @@ local function main()
         connect = connect,
         monitor = monitor,
         inventoryMgr = inventoryMgr,
-        meBridge = meBridge
+        meBridge = meBridge,
+        meSide = constants.ME_BARREL_SIDE
     })
     if not ok then
         print("Unexpected error: " .. tostring(runErr))

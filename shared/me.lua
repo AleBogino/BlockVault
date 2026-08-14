@@ -19,6 +19,19 @@ function ME.isConnected(me)
     return ok == true and res == true
 end
 
+function ME.isOnline(me)
+    if not me then return false end
+    local ok, res = pcall(function() return me.isOnline() end)
+    return ok == true and res == true
+end
+
+function ME.getAvailableItemStorage(me)
+    if not me then return 0 end
+    local ok, res = pcall(function() return me.getAvailableItemStorage() end)
+    if ok and type(res) == "number" then return res end
+    return 0
+end
+
 --- Count one coin denomination currently in the ME network.
 --- @return number count
 --- @return string|nil error
@@ -48,13 +61,14 @@ function ME.listCoins(me)
     return out
 end
 
---- Import `wanted` coin counts from `sourceName` into the ME network.
---- sourceName is a peripheral name the CALLING computer can reach (the barrel)
+--- Import `wanted` coin counts from the inventory on `side` of the ME Bridge.
+--- `side` is an absolute direction: "north", "south", "east", "west", "up", "down".
+--- @param side string direction of the deposit barrel relative to the ME Bridge
 --- @param wanted table { [coinId] = count }
 --- @return table imported   { [coinId] = actualCountImported }
 --- @return number totalValue
 --- @return table errors     { [coinId] = errorString }
-function ME.importCoins(me, sourceName, wanted)
+function ME.importCoins(me, side, wanted)
     local imported, errors = {}, {}
     local totalValue = 0
 
@@ -63,11 +77,13 @@ function ME.importCoins(me, sourceName, wanted)
         if type(want) == "number" and want > 0 then
             local value = constants.COIN_VALUES[coinId] or 0
             local ok, got, err = pcall(function()
-                return me.importItem({ name = coinId, count = want }, sourceName)
+                return me.importItem({ name = coinId, count = want }, side)
             end)
             if ok and err == nil and type(got) == "number" and got > 0 then
                 imported[coinId] = got
                 totalValue = totalValue + got * value
+            elseif ok and err == nil and type(got) == "number" then
+                errors[coinId] = "import returned 0 (check AE2 power, storage cell space, channels, or item id)"
             else
                 errors[coinId] = (err and tostring(err)) or tostring(got) or constants.ERROR.ME_IMPORT_FAILED
             end
@@ -77,11 +93,12 @@ function ME.importCoins(me, sourceName, wanted)
     return imported, totalValue, errors
 end
 
---- Export `counts` back out of the ME network into `targetName` (rollback).
+--- Export `counts` back out of the ME network into the inventory on `side` (rollback).
+--- @param side string direction of the deposit barrel relative to the ME Bridge
 --- @return table exported { [coinId] = actualCountExported }
 --- @return number totalValue
 --- @return table errors
-function ME.exportCoins(me, targetName, counts)
+function ME.exportCoins(me, side, counts)
     local exported, errors = {}, {}
     local totalValue = 0
 
@@ -90,7 +107,7 @@ function ME.exportCoins(me, targetName, counts)
         if type(want) == "number" and want > 0 then
             local value = constants.COIN_VALUES[coinId] or 0
             local ok, got, err = pcall(function()
-                return me.exportItem({ name = coinId, count = want }, targetName)
+                return me.exportItem({ name = coinId, count = want }, side)
             end)
             if ok and err == nil and type(got) == "number" and got > 0 then
                 exported[coinId] = got

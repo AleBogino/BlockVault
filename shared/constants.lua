@@ -102,6 +102,9 @@ M.COIN_ORDER = {
     "createdeco:zinc_coin",
 }
 
+-- Which side of the client ME Bridge touches the deposit barrel.
+M.ME_BARREL_SIDE = "up"
+
 -- error codes
 M.ERROR = {
     INVALID_SIGNATURE = "INVALID_SIGNATURE",
