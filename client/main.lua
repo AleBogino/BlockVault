@@ -87,7 +87,7 @@ if meName then
         meBridge = nil
     end
 else
-    print("WARNING: No ME Bridge found - physical deposits disabled.")
+    print("WARNING: No ME Bridge found: physical deposits disabled.")
 end
 
 local function connect()
