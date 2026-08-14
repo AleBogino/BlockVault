@@ -91,7 +91,7 @@ function Rest.startLogin(state)
         return
     end
 
-    local loginCode, _, loginResult, accountData =
+    local _, loginCode, loginResult, accountData =
         state.clientProtocol:handleLoginPacket(reply)
 
     if not loginCode then
