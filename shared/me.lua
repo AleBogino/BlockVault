@@ -40,6 +40,14 @@ function ME.getAvailableItemStorage(me)
     return 0
 end
 
+--- Extract stack size from an AP ME Bridge item table.
+local function itemAmount(stack)
+    if type(stack) ~= "table" then return nil end
+    if type(stack.count) == "number" then return stack.count end
+    if type(stack.amount) == "number" then return stack.amount end
+    return nil
+end
+
 --- Count one coin denomination currently in the ME network.
 --- @return number count
 --- @return string|nil error
@@ -59,15 +67,15 @@ function ME.getCoinCount(me, coinId)
         print("[ME] getCoinCount(" .. tostring(coinId) .. ") error: " .. tostring(err))
         return 0, constants.ERROR.ME_READ_FAILED
     end
-    if type(item) == "table" and type(item.count) == "number" then
-        return item.count, nil
+    local n = itemAmount(item)
+    if n ~= nil then
+        return n, nil
     end
     if type(item) == "table" and item[1] ~= nil then
         local total = 0
         for _, stack in ipairs(item) do
-            if type(stack) == "table" and type(stack.count) == "number" then
-                total = total + stack.count
-            end
+            local c = itemAmount(stack)
+            if c ~= nil then total = total + c end
         end
         return total, nil
     end
