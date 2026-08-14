@@ -10,6 +10,8 @@ local PROTOCOL = "ccbank"
  
 local M = {}
  
+M.PROTOCOL = PROTOCOL
+ 
 function M.open()
     if rednet.isOpen() then return true end
     local modemSide = nil

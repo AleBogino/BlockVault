@@ -7,6 +7,7 @@ local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
+local packet = require "shared.packet"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -22,6 +23,7 @@ function Rest.draw(state, message)
     local mon = state.monitor
     local lay = state.layout
 
+    ScreenManager.reset()
     mon.setBackgroundColor(colors.black)
     mon.clear()
 
@@ -135,45 +137,57 @@ function Rest.startLogin(state)
     local btnW = 9
     local btnX = math.floor((lay.width - btnW) / 2) + 1
     ScreenManager.reset()
+    local cancelled = false
     ScreenManager.register(Button.new(
         btnX, 12, btnX + btnW - 1, 13,
         "  Cancel  ",
         function()
-            Rest.draw(state, "Login cancelled.")
+            cancelled = true
         end,
         { bg = colors.gray, fg = colors.white }
     )):draw(mon)
 
-    -- Step 4: Wait for LOGIN_OK / LOGIN_FAIL / LOGIN_TIMEOUT
-    -- We use a timer-based wait loop
-    local deadline = os.epoch("utc") + LOGIN_TIMEOUT * 1000
-    while os.epoch("utc") < deadline do
-        local remaining = math.max(0, math.ceil((deadline - os.epoch("utc")) / 1000))
-        local pkt = state.network.receiveOnce(remaining)
-        if pkt then
-            local _, code, result, data = state.clientProtocol:handleLoginPacket(pkt)
-            if result == "LOGGED_IN" then
-                if data and not data.newAccount then
-                    Router.switch(MainMenu, data)
-                elseif data and data.newAccount then
-                    Rest.drawCreateAccountPrompt(state, data.username)
-                else
-                    Rest.draw(state, "Invalid account data received.")
-                end
-                return
-            elseif result == "LOGIN_FAIL" then
-                local reason = data and data.reason or "Unknown error"
-                Rest.draw(state, "Login failed: " .. reason)
-                return
-            elseif result == "LOGIN_TIMEOUT" then
-                Rest.draw(state, "Login timed out. Please try again.")
-                return
+    -- Step 4: Wait for LOGIN_OK / LOGIN_FAIL / LOGIN_TIMEOUT, or a tap on Cancel.
+    local loginTimer = os.startTimer(LOGIN_TIMEOUT)
+    while true do
+        local event, p1, p2, p3 = os.pullEvent()
+
+        if event == "monitor_touch" then
+            ScreenManager.dispatch(p2, p3)
+            if cancelled then
+                break
             end
+
+        elseif event == "rednet_message" then
+            -- p1 = senderId, p2 = message, p3 = protocol
+            if p3 == state.network.PROTOCOL and packet.validate(p2) then
+                local _, _, result, data = state.clientProtocol:handleLoginPacket(p2)
+                if result == "LOGGED_IN" then
+                    if data and not data.newAccount then
+                        Router.switch(MainMenu, data)
+                    elseif data and data.newAccount then
+                        Rest.drawCreateAccountPrompt(state, data.username)
+                    else
+                        Rest.draw(state, "Invalid account data received.")
+                    end
+                    return
+                elseif result == "LOGIN_FAIL" then
+                    local reason = data and data.reason or "Unknown error"
+                    Rest.draw(state, "Login failed: " .. reason)
+                    return
+                elseif result == "LOGIN_TIMEOUT" then
+                    Rest.draw(state, "Login timed out. Please try again.")
+                    return
+                end
+            end
+
+        elseif event == "timer" and p1 == loginTimer then
+            Rest.draw(state, "Login timed out. Please try again.")
+            return
         end
     end
 
-    -- If we get here, the client-side timeout fired
-    Rest.draw(state, "Login timed out. Please try again.")
+    Rest.draw(state, "Login cancelled.")
 end
 
 --- Prompt to create a new account

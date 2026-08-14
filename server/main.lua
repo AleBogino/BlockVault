@@ -27,7 +27,7 @@ if not ok then
 end
 print("Modem open. Listening for connections...")
 if network.chatBox then
-    print("Chat box detected. Chat login active. Players use: .bvault login <code>")
+    print("Chat box detected. Chat login active. Players use: $.bvault login <code>")
 else
     print("WARNING: No chat box attached - chat login will not work.")
 end
