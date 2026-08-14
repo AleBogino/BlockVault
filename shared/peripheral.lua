@@ -24,7 +24,7 @@ function Peripheral.scan()
             table.insert(cat.modems, name)
         elseif ptype == "monitor" then
             table.insert(cat.monitors, name)
-        elseif ptype == "me_bridge" then
+        elseif ptype == "meBridge" then
             table.insert(cat.meBridges, name)
         end
 
