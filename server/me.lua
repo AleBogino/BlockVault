@@ -9,6 +9,14 @@ local ME = require "shared.me"
 local ServerME = {}
 local bridge = nil
 
+-- DEBUG TEMP
+local function dump(v)
+    if v == nil then return "nil" end
+    local ok, s = pcall(textutils.serialize, v)
+    if ok then return s end
+    return tostring(v)
+end
+
 function ServerME.init()
     local cat = Peripheral.scan()
     local name = Peripheral.first(cat.meBridges)
@@ -35,12 +43,16 @@ end
 
 function ServerME.verifyDeposit(required)
     if not bridge then
+        print("[SRV][ME] verifyDeposit: no bridge configured")
         return nil, constants.ERROR.NO_ME_BRIDGE
     end
+    print("[SRV][ME] verifyDeposit required=" .. dump(required))
     local value, err = ME.verifyCoins(bridge, required)
     if err then
+        print("[SRV][ME] verifyDeposit FAILED: " .. tostring(err))
         return nil, err
     end
+    print("[SRV][ME] verifyDeposit OK value=" .. tostring(value))
     return value, nil
 end
 

@@ -50,9 +50,11 @@ local function drawInsert(state, acct, message)
             end
             local total, breakdown, scanErr = inv:scan()
             if scanErr then
+                print("[CLI][DEPOSIT] scan error: " .. tostring(scanErr))
                 Deposit.draw(state, acct, PHASE.INSERT, scanErr)
                 return
             end
+            print(("[CLI][DEPOSIT] scan total=%d breakdown=%s"):format(total, textutils.serialize(breakdown or {})))
             Deposit.draw(state, acct, PHASE.CONFIRM, nil, breakdown, total)
         end, {
             bg = colors.green,
@@ -136,6 +138,8 @@ local function drawConfirm(state, acct, breakdown, total)
 
                 -- 1) Import coins from the barrel (adjacent to the ME Bridge on state.meSide)
                 local imported, importedValue, importErrs = ME.importCoins(me, state.meSide, breakdown)
+                print(("[CLI][DEPOSIT] import result: value=%d imported=%s errors=%s")
+                    :format(importedValue or 0, textutils.serialize(imported or {}), textutils.serialize(importErrs or {})))
 
                 if importedValue <= 0 then
                     local why = "No coins were imported."
@@ -143,6 +147,7 @@ local function drawConfirm(state, acct, breakdown, total)
                         local firstCoin = next(importErrs)
                         why = "ME import failed: " .. tostring(importErrs[firstCoin])
                     end
+                    print("[CLI][DEPOSIT] import failed: " .. why)
                     Deposit.draw(state, acct, PHASE.INSERT, why)
                     return
                 end
@@ -157,7 +162,8 @@ local function drawConfirm(state, acct, breakdown, total)
                 if not payload then
                     -- Rollback: return coins to the barrel
                     ME.exportCoins(me, state.meSide, imported)
-                    Deposit.draw(state, acct, PHASE.INSERT, "Network error - coins returned: " .. tostring(err))
+                    print("[CLI][DEPOSIT] network error - rollback: " .. tostring(err))
+                    Deposit.draw(state, acct, PHASE.INSERT, "Network error - coins returned.")
                     return
                 end
 
@@ -165,6 +171,7 @@ local function drawConfirm(state, acct, breakdown, total)
                     -- Rollback: return coins to the barrel
                     ME.exportCoins(me, state.meSide, imported)
                     local code = payload.code or "UNKNOWN"
+                    print("[CLI][DEPOSIT] server rejected: " .. code)
                     Deposit.draw(state, acct, PHASE.INSERT, "Deposit rejected (" .. code .. ") - coins returned.")
                     return
                 end

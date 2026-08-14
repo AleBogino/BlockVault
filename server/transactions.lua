@@ -67,10 +67,13 @@ function Transactions.deposit(payload, authResult)
     if resolved.permission == constants.PERMISSION.USER then
         local verified, verr = ServerME.verifyDeposit(payload.coinBreakdown)
         if not verified then
+            print("[SRV][DEPOSIT] verifyDeposit failed for " .. tostring(payload.username) .. ": " .. tostring(verr))
             return false, verr
         end
         -- The reported amount must be exactly backed
         if verified < payload.amount then
+            print(("[SRV][DEPOSIT] verified=%d < amount=%d for %s")
+                :format(verified, payload.amount, tostring(payload.username)))
             return false, constants.ERROR.COINS_NOT_FOUND
         end
     end
