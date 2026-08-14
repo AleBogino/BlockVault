@@ -14,8 +14,14 @@ files.shared = {
         path = "shared/identity.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/shared/identity.lua"
     }, {
+        path = "shared/me.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/shared/me.lua"
+    }, {
         path = "shared/packet.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/shared/packet.lua"
+    }, {
+        path = "shared/peripheral.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/shared/peripheral.lua"
     }, {
         path = "shared/replay.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/shared/replay.lua"
@@ -54,6 +60,9 @@ files.server = {
         path = "server/main.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/main.lua"
     }, {
+        path = "server/me.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/me.lua"
+    }, {
         path = "server/network.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/network.lua"
     }, {
@@ -69,6 +78,9 @@ files.client = {
     {
         path = "client/config.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/config.lua"
+    }, {
+        path = "client/inventory.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/inventory.lua"
     }, {
         path = "client/main.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/main.lua"
