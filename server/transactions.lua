@@ -14,6 +14,18 @@ local Transactions = {}
 local pendingWithdraws = {}
 local PENDING_WITHDRAW_TTL_MS = 60000
 
+-- forward declaration: withdrawConfirm is defined before makeTxRecord
+--- Build a transaction log entry
+local makeTxRecord = function(txType, fromUser, toUser, amount, balances)
+    return {
+        type = txType,
+        from = fromUser,
+        to = toUser,
+        amount = amount,
+        balances = balances
+    }
+end
+
 function Transactions.evictExpiredWithdraws()
     local cutoff = utils.now() - PENDING_WITHDRAW_TTL_MS
     for senderId, entry in pairs(pendingWithdraws) do
@@ -148,17 +160,6 @@ function Transactions.withdrawConfirm(payload, authResult, senderId)
     return true, { balance = acct.balance }
 end
 
-
---- Build a transaction log entry
-local function makeTxRecord(txType, fromUser, toUser, amount, balances)
-    return {
-        type = txType,
-        from = fromUser,
-        to = toUser,
-        amount = amount,
-        balances = balances
-    }
-end
 
 --- persist two acounts + transaction log
 --- @return boolean ok
