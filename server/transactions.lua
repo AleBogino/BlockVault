@@ -29,10 +29,11 @@ end
 local function dropPending(senderId)
     local entry = pendingWithdraws[senderId]
     if entry then
-        ServerME.release(entry.breakdown)
+        local breakdown = entry.breakdown
+        ServerME.release(breakdown)
         pendingWithdraws[senderId] = nil
-        -- recover staged coins
-        ServerME.sweepBuffer()
+        -- recover staged coins that were never claimed
+        ServerME.sweepBuffer(breakdown)
     end
     return entry
 end
@@ -224,6 +225,12 @@ function Transactions.deposit(payload, authResult)
         return false, constants.ERROR.INVALID_PACKET
     end
 
+    -- Read before touching any coins
+    local acct = db.getAccount(payload.username)
+    if not acct then
+        return false, constants.ERROR.ACCOUNT_NOT_FOUND
+    end
+
     -- USER coins must be already on the network
     if resolved.permission == constants.PERMISSION.USER then
         local verified, verr = ServerME.verifyDeposit(payload.coinBreakdown)
@@ -239,12 +246,6 @@ function Transactions.deposit(payload, authResult)
         end
     end
 
-    -- Read
-    local acct = db.getAccount(payload.username)
-    if not acct then
-        return false, constants.ERROR.ACCOUNT_NOT_FOUND
-    end
-
     acct.balance = acct.balance + payload.amount
 
     -- Persist
@@ -258,7 +259,9 @@ function Transactions.deposit(payload, authResult)
         coinBreakdown = payload.coinBreakdown
     })
     db.appendTransaction(tx)
-    ServerME.sweepBuffer()
+
+    -- Move the deposited coins out of the buffer barrel
+    ServerME.sweepBuffer(payload.coinBreakdown)
 
     return true, {
         balance = acct.balance,

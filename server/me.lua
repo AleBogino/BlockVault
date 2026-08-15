@@ -41,6 +41,16 @@ function ServerME.init()
         end
     end
     local bufferName = constants.ME_BUFFER_NAME
+    if not bufferName then
+        -- Autodetect the dispense barrel
+        for _, invName in ipairs(cat.inventories) do
+            local ptype = tostring(cat.all[invName] or ""):lower()
+            if ptype:find("barrel", 1, true) then
+                bufferName = invName
+                break
+            end
+        end
+    end
     if bufferName then
         local ok, b = pcall(peripheral.wrap, bufferName)
         if ok and type(b) == "table" and type(b.list) == "function" then
@@ -114,18 +124,35 @@ function ServerME.verifyDeposit(required)
         return value, nil
     end
 
-    -- Fallback: no buffer configured → old full-main-network verification.
     if not bridge then
         print("[SRV][ME] verifyDeposit: no bridge configured")
         return nil, constants.ERROR.NO_ME_BRIDGE
     end
-    local value, err = ME.verifyCoins(bridge, required)
-    if err then
-        print("[SRV][ME] verifyDeposit FAILED: " .. tostring(err))
-        return nil, err
+
+    local side = constants.ME_BUFFER_SIDE
+    local pulled, _, perr = ME.importCoins(bridge, side, required)
+    for _, coinId in ipairs(constants.COIN_ORDER) do
+        local need = required and required[coinId] or 0
+        if type(need) == "number" and need > 0 and (pulled[coinId] or 0) < need then
+            print(("[SRV][ME] verifyDeposit FAILED: %s need=%d pulled=%d (%s)"):format(
+                coinId, need, pulled[coinId] or 0, tostring(perr and perr[coinId])))
+            if next(pulled) then
+                ME.exportCoins(bridge, side, pulled)
+            end
+            return nil, constants.ERROR.COINS_NOT_FOUND
+        end
     end
-    print("[SRV][ME] verifyDeposit OK value=" .. tostring(value))
-    return value, nil
+
+    local verifiedValue = 0
+    for _, coinId in ipairs(constants.COIN_ORDER) do
+        local need = required and required[coinId] or 0
+        if type(need) == "number" and need > 0 then
+            verifiedValue = verifiedValue + need * (constants.COIN_VALUES[coinId] or 0)
+        end
+    end
+
+    print("[SRV][ME] verifyDeposit OK value=" .. tostring(verifiedValue) .. " pulled=" .. dump(pulled))
+    return verifiedValue, nil
 end
 
 --- Check if the network hast at least 'required' of every denomination
@@ -192,10 +219,6 @@ end
 --- @param breakdown table { [coinId] = count }
 --- @return boolean ok
 function ServerME.stageWithdrawal(breakdown)
-    if not buffer then
-        print("[SRV][ME] stageWithdrawal: no buffer configured")
-        return false
-    end
     if not bridge then
         print("[SRV][ME] stageWithdrawal: no bridge configured")
         return false
@@ -215,11 +238,14 @@ end
 
 --- Take every coin out of dispense buffer back into the vault
 --- @return table|nil swept { [coinId] = count }
-function ServerME.sweepBuffer()
-    if not buffer or not bridge then
+function ServerME.sweepBuffer(breakdown)
+    if not bridge then
         return nil
     end
     local counts = bufferCoinCounts()
+    if not counts then
+        counts = breakdown
+    end
     if not counts or not next(counts) then
         return {}
     end
