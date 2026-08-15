@@ -32,7 +32,7 @@ end
 --- @return boolean ok
 --- @return table|string result {breakdown = {[coinId]=count}} or error code
 function Transactions.withdrawRequest(payload, authResult, senderId)
-    local resolved, rerr = Auth.requirePermission(authResult, constants.Permission.USER)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.USER)
     if not resolved then
         return false, rerr
     end
