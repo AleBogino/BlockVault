@@ -8,6 +8,7 @@ local ME = require "shared.me"
 
 local ServerME = {}
 local bridge = nil
+local buffer = nil
 local reserved = {}
 
 -- DEBUG TEMP
@@ -24,34 +25,100 @@ end
 
 function ServerME.init()
     local cat = Peripheral.scan()
+
     local name = Peripheral.first(cat.meBridges)
     if not name then
         print("WARNING: No ME Bridge found on the server.")
-        return false
+    else
+        bridge = ME.wrap(name)
+        if not bridge then
+            print("WARNING: Failed to wrap ME Bridge " .. tostring(name))
+        elseif ME.isConnected(bridge) then
+            print("ME Bridge ready: " .. tostring(name))
+        else
+            print("WARNING: ME Bridge not connected to an AE2 network: " .. tostring(name))
+            bridge = nil
+        end
+    end
+    local bufferName = constants.ME_BUFFER_NAME
+    if bufferName then
+        local ok, b = pcall(peripheral.wrap, bufferName)
+        if ok and type(b) == "table" and type(b.list) == "function" then
+            buffer = b
+            print("Dispense buffer ready: " .. tostring(bufferName))
+        else
+            buffer = nil
+            print("WARNING: Dispense buffer not found or not an inventory: " .. tostring(bufferName))
+        end
     end
 
-    bridge = ME.wrap(name)
-    if not bridge then
-        print("WARNING: Failed to wrap ME Bridge " .. tostring(name))
-        return false
-    end
-
-    if ME.isConnected(bridge) then
-        print("ME Bridge ready: " .. tostring(name))
+    if bridge then
         return true
     end
-
-    print("WARNING: ME Bridge not connected to an AE2 network: " .. tostring(name))
-    bridge = nil
     return false
 end
 
+--- count coins currently in dispense buffer
+local function bufferCoinCounts()
+    if not buffer then
+        return nil
+    end
+    local ok, items = pcall(function()
+        return buffer.list()
+    end)
+    if not ok or type(items) ~= "table" then
+        print("[SRV][ME] bufferCoinCounts: failed to list buffer contents")
+        return nil
+    end
+    local out = {}
+    for _, item in pairs(items) do
+        if item and item.name and constants.COIN_VALUES[item.name] then
+            local n = item.count or 0
+            out[item.name] = (out[item.name] or 0) + n
+        end
+    end
+    return out
+end
+
+--- verify an inventory of coins, at least 'required' of each denomination
+--- @param counts table { [coinId] = count }
+--- @param required table { [coinId] = count }
+--- @return number|nil verifiedValue  sum of required values present (nil if short)
+local function verifyInventoryCoins(counts, required)
+    local verifiedValue = 0
+    for _, coinId in ipairs(constants.COIN_ORDER) do
+        local need = required and required[coinId] or 0
+        if type(need) == "number" and need > 0 then
+            local have = counts[coinId] or 0
+            if have < need then
+                return nil
+            end
+            verifiedValue = verifiedValue + need * (constants.COIN_VALUES[coinId] or 0)
+        end
+    end
+    return verifiedValue
+end
+
 function ServerME.verifyDeposit(required)
+    print("[SRV][ME] verifyDeposit required=" .. dump(required))
+
+    -- Deposited coins land in the dispense buffer
+    local counts = bufferCoinCounts()
+    if counts then
+        local value = verifyInventoryCoins(counts, required)
+        if not value then
+            print("[SRV][ME] verifyDeposit FAILED: coins not in buffer")
+            return nil, constants.ERROR.COINS_NOT_FOUND
+        end
+        print("[SRV][ME] verifyDeposit OK value=" .. tostring(value))
+        return value, nil
+    end
+
+    -- Fallback: no buffer configured → old full-main-network verification.
     if not bridge then
         print("[SRV][ME] verifyDeposit: no bridge configured")
         return nil, constants.ERROR.NO_ME_BRIDGE
     end
-    print("[SRV][ME] verifyDeposit required=" .. dump(required))
     local value, err = ME.verifyCoins(bridge, required)
     if err then
         print("[SRV][ME] verifyDeposit FAILED: " .. tostring(err))
@@ -119,6 +186,50 @@ function ServerME.getReserved()
         copy[coinId] = count
     end
     return copy
+end
+
+--- Push approved withdrawal into dispense buffer
+--- @param breakdown table { [coinId] = count }
+--- @return boolean ok
+function ServerME.stageWithdrawal(breakdown)
+    if not buffer then
+        print("[SRV][ME] stageWithdrawal: no buffer configured")
+        return false
+    end
+    if not bridge then
+        print("[SRV][ME] stageWithdrawal: no bridge configured")
+        return false
+    end
+    local side = constants.ME_BUFFER_SIDE
+    local exported, totalValue, errors = ME.exportCoins(bridge, side, breakdown)
+    if errors and next(errors) then
+        print(("[SRV][ME] stageWithdrawal: export errors %s - rolling back partial stage"):format(dump(errors)))
+        if exported and next(exported) then
+            ME.importCoins(bridge, side, exported)
+        end
+        return false
+    end
+    print(("[SRV][ME] stageWithdrawal: staged %s (%d units) into buffer"):format(dump(exported), totalValue or 0))
+    return true
+end
+
+--- Take every coin out of dispense buffer back into the vault
+--- @return table|nil swept { [coinId] = count }
+function ServerME.sweepBuffer()
+    if not buffer or not bridge then
+        return nil
+    end
+    local counts = bufferCoinCounts()
+    if not counts or not next(counts) then
+        return {}
+    end
+    local side = constants.ME_BUFFER_SIDE
+    local swept, _, errors = ME.importCoins(bridge, side, counts)
+    if errors and next(errors) then
+        print(("[SRV][ME] sweepBuffer: import errors %s"):format(dump(errors)))
+    end
+    print(("[SRV][ME] sweepBuffer: swept %s"):format(dump(swept)))
+    return swept
 end
 
 --- Coin breakdown for a target value (using what we have)

@@ -31,6 +31,8 @@ local function dropPending(senderId)
     if entry then
         ServerME.release(entry.breakdown)
         pendingWithdraws[senderId] = nil
+        -- recover staged coins
+        ServerME.sweepBuffer()
     end
     return entry
 end
@@ -91,6 +93,11 @@ function Transactions.withdrawRequest(payload, authResult, senderId)
 
     -- Reserve the approved coins
     ServerME.reserve(breakdown)
+
+    if not ServerME.stageWithdrawal(breakdown) then
+        ServerME.release(breakdown)
+        return false, constants.ERROR.ME_EXPORT_FAILED
+    end
 
     pendingWithdraws[senderId] = {
         username = payload.username,
@@ -251,6 +258,7 @@ function Transactions.deposit(payload, authResult)
         coinBreakdown = payload.coinBreakdown
     })
     db.appendTransaction(tx)
+    ServerME.sweepBuffer()
 
     return true, {
         balance = acct.balance,

@@ -104,8 +104,12 @@ M.COIN_ORDER = {
     "createdeco:zinc_coin",
 }
 
--- Which side of the client ME Bridge touches the deposit barrel.
+-- ME stuff
+-- which side of the client Me bridge touches the barrel
 M.ME_BARREL_SIDE = "up"
+M.ME_BUFFER_NAME = nil
+-- which side of the server me bridge touches the buffer barrel
+M.ME_BUFFER_SIDE = "up"
 
 -- error codes
 M.ERROR = {
