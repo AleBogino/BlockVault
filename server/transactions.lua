@@ -10,6 +10,145 @@ local ServerME = require "server.me"
 
 local Transactions = {}
 
+-- TODO server coin reservation and release
+local pendingWithdraws = {}
+local PENDING_WITHDRAW_TTL_MS = 60000
+
+function Transactions.evictExpiredWithdraws()
+    local cutoff = utils.now() - PENDING_WITHDRAW_TTL_MS
+    for senderId, entry in pairs(pendingWithdraws) do
+        if entry.expiresAt < cutoff then
+            pendingWithdraws[senderId] = nil
+            print(("[SRV][WITHDRAW] evicted expired pending withdraw for %s (client %d)"):format(
+                tostring(entry.username), senderId))
+        end
+    end
+end
+
+--- check funds + coin availability and register withdrawal
+--- @param payload table {username, amount}
+--- @param authResult table Auth.resolve result
+--- @param senderId number client computer ID
+--- @return boolean ok
+--- @return table|string result {breakdown = {[coinId]=count}} or error code
+function Transactions.withdrawRequest(payload, authResult, senderId)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.Permission.USER)
+    if not resolved then
+        return false, rerr
+    end
+    if not utils.isNonEmptyString(payload.username) then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+    if not utils.isNonNegativeNumber(payload.amount) or payload.amount <= 0 then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+
+    -- USER can only extract from their own account
+    if resolved.permission == constants.PERMISSION.USER and payload.username ~= resolved.account.username then
+        return false, constants.ERROR.PERMISSION_DENIED
+    end
+
+    local acct = db.getAccount(payload.username)
+    if not acct then
+        return false, constants.ERROR.ACCOUNT_NOT_FOUND
+    end
+
+    if acct.balance < payload.amount then
+        return false, constants.ERROR.INSUFFICIENT_FUNDS
+    end
+
+    -- TODO if coinBreakdown returns COINS_NOT_FOUND, attempt to craft em once
+
+    local breakdown, berr = ServerME.coinBreakdown(payload.amount)
+    if not breakdown then
+        return false, berr or constants.ERROR.COINS_NOT_FOUND
+    end
+
+    -- kill pending requests
+    Transactions.evictExpiredWithdraws()
+
+    pendingWithdraws[senderId] = {
+        username = payload.username,
+        amount = payload.amount,
+        breakdown = breakdown,
+        expiresAt = utils.now() + PENDING_WITHDRAW_TTL_MS
+    }
+
+    print(("[SRV][WITHDRAW] request approved for %s amount=%d (pending, no debit yet)"):format(payload.username,
+        payload.amount))
+
+    return true, {
+        breakdown = breakdown
+    }
+end
+
+--- Export coins, debit account and record transaction.
+--- @param payload table {username, amount, [coinBreakdown]}
+--- @param authResult table Auth.resolve result
+--- @param senderId number client computer ID
+--- @return boolean ok
+--- @return table|string result {balance} or error code
+function Transactions.withdrawConfirm(payload, authResult, senderId)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.USER)
+    if not resolved then
+        return false, rerr
+    end
+
+    if not utils.isNonEmptyString(payload.username) then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+    if not utils.isNonNegativeNumber(payload.amount) or payload.amount <= 0 then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+
+    local pending = pendingWithdraws[senderId]
+    if not pending then
+        return false, constants.ERROR.INVALID_PACKET   -- no matching request
+    end
+    if pending.expiresAt < utils.now() then
+        pendingWithdraws[senderId] = nil
+        return false, constants.ERROR.INVALID_PACKET   -- request expired
+    end
+    if pending.username ~= payload.username or pending.amount ~= payload.amount then
+        pendingWithdraws[senderId] = nil
+        return false, constants.ERROR.INVALID_PACKET
+    end
+
+    -- USER can only extract from their own account
+    if resolved.permission == constants.PERMISSION.USER and payload.username ~= resolved.account.username then
+        pendingWithdraws[senderId] = nil
+        return false, constants.ERROR.PERMISSION_DENIED
+    end
+
+    local acct = db.getAccount(payload.username)
+    if not acct then
+        pendingWithdraws[senderId] = nil
+        return false, constants.ERROR.ACCOUNT_NOT_FOUND
+    end
+    if acct.balance < payload.amount then
+        pendingWithdraws[senderId] = nil
+        return false, constants.ERROR.INSUFFICIENT_FUNDS
+    end
+
+    pendingWithdraws[senderId] = nil
+
+    acct.balance = acct.balance - payload.amount
+
+    local ok, err = db.saveAccount(acct)
+    if not ok then
+        return false, constants.ERROR.SERVER_ERROR
+    end
+
+    local tx = makeTxRecord("WITHDRAW", payload.username, nil, payload.amount, {
+        [payload.username] = acct.balance,
+        coinBreakdown = payload.coinBreakdown or pending.breakdown,
+    })
+    db.appendTransaction(tx)
+
+    return true, { balance = acct.balance }
+end
+
+
 --- Build a transaction log entry
 local function makeTxRecord(txType, fromUser, toUser, amount, balances)
     return {
@@ -72,8 +211,8 @@ function Transactions.deposit(payload, authResult)
         end
         -- The reported amount must be exactly backed
         if verified < payload.amount then
-            print(("[SRV][DEPOSIT] verified=%d < amount=%d for %s")
-                :format(verified, payload.amount, tostring(payload.username)))
+            print(("[SRV][DEPOSIT] verified=%d < amount=%d for %s"):format(verified, payload.amount,
+                tostring(payload.username)))
             return false, constants.ERROR.COINS_NOT_FOUND
         end
     end
@@ -94,13 +233,13 @@ function Transactions.deposit(payload, authResult)
 
     local tx = makeTxRecord("DEPOSIT", nil, payload.username, payload.amount, {
         [payload.username] = acct.balance,
-        coinBreakdown = payload.coinBreakdown,
+        coinBreakdown = payload.coinBreakdown
     })
     db.appendTransaction(tx)
 
     return true, {
         balance = acct.balance,
-        deposited = payload.amount,
+        deposited = payload.amount
     }
 end
 
@@ -153,7 +292,6 @@ function Transactions.withdraw(payload, authResult)
         balance = acct.balance
     }
 end
-
 
 --- Transfer money from one account to another
 --- @param payload table {from, to, amount}
@@ -217,7 +355,6 @@ function Transactions.transfer(payload, authResult)
     }
 end
 
-
 --- Get the balance of an account
 --- @param payload table {username}
 --- @param authResult table|nil AuthResult from Auth.resolve(session) {account, permission}
@@ -232,8 +369,7 @@ function Transactions.balance(payload, authResult)
     end
 
     -- user can only check their own balance
-    if resolved.permission == constants.PERMISSION.USER
-       and payload.username ~= resolved.account.username then
+    if resolved.permission == constants.PERMISSION.USER and payload.username ~= resolved.account.username then
         return false, constants.ERROR.PERMISSION_DENIED
     end
 
@@ -242,7 +378,10 @@ function Transactions.balance(payload, authResult)
         return false, constants.ERROR.ACCOUNT_NOT_FOUND
     end
 
-    return true, { username = acct.username, balance = acct.balance }
+    return true, {
+        username = acct.username,
+        balance = acct.balance
+    }
 end
 
 --- Get the transaction history of an account
@@ -257,8 +396,7 @@ function Transactions.history(payload, authResult)
         return false, constants.ERROR.INVALID_PACKET
     end
 
-    if resolved.permission == constants.PERMISSION.USER
-       and payload.username ~= resolved.account.username then
+    if resolved.permission == constants.PERMISSION.USER and payload.username ~= resolved.account.username then
         return false, constants.ERROR.PERMISSION_DENIED
     end
 
@@ -268,7 +406,9 @@ function Transactions.history(payload, authResult)
     end
 
     local txs = db.getTransactions(payload.username, limit)
-    return true, { transactions = txs }
+    return true, {
+        transactions = txs
+    }
 end
 
 return Transactions

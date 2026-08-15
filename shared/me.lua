@@ -96,6 +96,45 @@ function ME.listCoins(me)
     return out
 end
 
+-- calculate minimum number of coins for target value
+-- largest denomination first
+--- @param target number total value to dispense, in account units
+--- @param available table { [coinId] = count } (as returned by ME.listCoins)
+--- @return table|nil breakdown { [coinId] = count }
+--- @return number|nil achieved value (== target when successful)
+function ME.makeChange(target, available)
+    if type(target) ~= "number" or target <= 0 then
+        return nil, nil
+    end
+    available = available or {}
+
+    local breakdown = {}
+    local remaining = target
+
+    for _, coinId in ipairs(constants.COIN_ORDER) do
+        if remaining <= 0 then
+            break
+        end
+        local value = constants.COIN_VALUES[coinId] or 0
+        if value > 0 then
+            local have = available[coinId] or 0
+            local want = math.min(math.floor(remaining / value), have)
+            if want > 0 then
+                breakdown[coinId] = want
+                remaining = remaining - want * value
+            end
+        end
+    end
+
+    if remaining ~= 0 then
+        -- Not enough coins to make exact change.
+        -- TODO auto-crafting
+        return nil, nil
+    end
+
+    return breakdown, target
+end
+
 --- Import `wanted` coin counts from the inventory on `side` of the ME Bridge.
 --- `side` is an absolute direction: "north", "south", "east", "west", "up", "down".
 --- @param side string direction of the deposit barrel relative to the ME Bridge

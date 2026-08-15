@@ -13,7 +13,6 @@ local Auth = {}
 --- @class AuthResult
 --- @field account    table   the full account record from accounts.db
 --- @field permission string  "USER" | "ADMIN" | "SYSTEM"
-
 --- Map a session to an account
 --- @param session  table|nil  Session object from protocol
 --- @param username string|nil The detected player username

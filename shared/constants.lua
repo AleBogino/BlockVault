@@ -32,6 +32,8 @@ M.PACKET = {
     TRANSFER = "TRANSFER",
     DEPOSIT = "DEPOSIT",
     WITHDRAW = "WITHDRAW",
+    WITHDRAW_REQUEST = "WITHDRAW_REQUEST",
+    WITHDRAW_CONFIRM = "WITHDRAW_CONFIRM",
     BALANCE = "BALANCE",
     HISTORY = "HISTORY",
 
@@ -125,6 +127,7 @@ M.ERROR = {
     ME_NOT_CONNECTED = "ME_NOT_CONNECTED",
     ME_IMPORT_FAILED = "ME_IMPORT_FAILED",
     ME_READ_FAILED = "ME_READ_FAILED",
+    ME_EXPORT_FAILED = "ME_EXPORT_FAILED",
     COINS_NOT_FOUND = "COINS_NOT_FOUND",
     NO_INVENTORY = "NO_INVENTORY",
 }
@@ -152,6 +155,10 @@ M.PAYLOAD_SCHEMA = {
     DEPOSIT_OK = {},
     WITHDRAW = { "username", "amount" },
     WITHDRAW_OK = {},
+    WITHDRAW_REQUEST = { "username", "amount" },
+    WITHDRAW_REQUEST_OK = {},
+    WITHDRAW_CONFIRM = { "username", "amount" },
+    WITHDRAW_CONFIRM_OK = {},   
     BALANCE = { "username" },
     BALANCE_OK = {},
     HISTORY = { "username" },

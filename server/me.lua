@@ -56,4 +56,31 @@ function ServerME.verifyDeposit(required)
     return value, nil
 end
 
+--- Check if the network hast at least 'required' of every denomination
+--- @return number | nil verifiedValue
+--- @return string | nil error
+function ServerME.verifyAvailable(required)
+    if not bridge then
+        print("[SRV][ME] verifyAvailable: no bridge configured")
+        return nil, constants.ERROR.NO_ME_BRIDGE
+    end
+    return ME.verifyCoins(bridge, required)
+end
+
+--- Coin breakdown for a target value (using what we have)
+function ServerME.coinBreakdown(target)
+    if not bridge then
+        print("[SRV][ME] coinBreakdown: no bridge configured")
+        return nil, constants.ERROR.NO_ME_BRIDGE
+    end
+    local available = ME.listCoins(bridge)
+    local breakdown = ME.makeChange(target, available)
+    if not breakdown then
+        print(("[SRV][ME] coinBreakdown: cannot make exact change for %d (available=%s)")
+            :format(target, dump(available)))
+        return nil, constants.ERROR.COINS_NOT_FOUND
+    end
+    return breakdown, nil
+end
+
 return ServerME

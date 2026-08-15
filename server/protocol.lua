@@ -45,7 +45,7 @@ function ServerProtocol.new(opts)
         pending = {},
         pendingLogins = {},
         sessions = {},
-        playerDetector = opts.playerDetector,
+        playerDetector = opts.playerDetector
     }, ServerProtocol)
 end
 
@@ -115,7 +115,7 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
     if session then
         session.lastActivity = utils.now()
     end
-    
+
     local targetUsername = payload.username or payload.from
     local authResult, authErr = Auth.resolve(session, targetUsername)
 
@@ -132,6 +132,7 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
     if isCreateAccount and not authResult then
         -- authResult is nil, handled by createAccount
     end
+
     local username = authResult and authResult.account.username or targetUsername
 
     -- go forth, children
@@ -149,6 +150,10 @@ function ServerProtocol:onOperational(senderId, packetType, payload, session, se
         ok, result = Transactions.deposit(payload, authResult)
     elseif packetType == constants.PACKET.WITHDRAW then
         ok, result = Transactions.withdraw(payload, authResult)
+    elseif packetType == constants.PACKET.WITHDRAW_REQUEST then
+        ok, result = Transactions.withdrawRequest(payload, authResult, senderId)
+    elseif packetType == constants.PACKET.WITHDRAW_CONFIRM then
+        ok, result = Transactions.withdrawConfirm(payload, authResult, senderId)
     elseif packetType == constants.PACKET.TRANSFER then
         ok, result = Transactions.transfer(payload, authResult)
     elseif packetType == constants.PACKET.BALANCE then
@@ -312,8 +317,6 @@ function ServerProtocol:_evictStaleSessions()
     end
 end
 
-
-
 --- Query the server's playerDetector for online players
 --- @return boolean ok
 --- @return table|string result list of player names or error code
@@ -330,7 +333,9 @@ function ServerProtocol:_handleGetOnlinePlayers()
             table.insert(players, name)
         end
     end
-    return true, { players = players }
+    return true, {
+        players = players
+    }
 end
 
 function ServerProtocol:_handleHello(senderId, pkt, send)
