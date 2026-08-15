@@ -1,4 +1,5 @@
 -- Withdraw screen: amount entry via keypad
+local Button = require "client.ui.button"
 local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Net = require "client.ui.net"
