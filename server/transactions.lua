@@ -10,7 +10,6 @@ local ServerME = require "server.me"
 
 local Transactions = {}
 
--- TODO server coin reservation and release
 local pendingWithdraws = {}
 local PENDING_WITHDRAW_TTL_MS = 60000
 
@@ -26,11 +25,21 @@ local makeTxRecord = function(txType, fromUser, toUser, amount, balances)
     }
 end
 
+--- Drop pending withdraws and reserved coins
+local function dropPending(senderId)
+    local entry = pendingWithdraws[senderId]
+    if entry then
+        ServerME.release(entry.breakdown)
+        pendingWithdraws[senderId] = nil
+    end
+    return entry
+end
+
 function Transactions.evictExpiredWithdraws()
     local cutoff = utils.now() - PENDING_WITHDRAW_TTL_MS
     for senderId, entry in pairs(pendingWithdraws) do
         if entry.expiresAt < cutoff then
-            pendingWithdraws[senderId] = nil
+            dropPending(senderId)
             print(("[SRV][WITHDRAW] evicted expired pending withdraw for %s (client %d)"):format(
                 tostring(entry.username), senderId))
         end
@@ -69,6 +78,10 @@ function Transactions.withdrawRequest(payload, authResult, senderId)
         return false, constants.ERROR.INSUFFICIENT_FUNDS
     end
 
+    -- Free expired reservations
+    Transactions.evictExpiredWithdraws()
+    dropPending(senderId)
+
     -- TODO if coinBreakdown returns COINS_NOT_FOUND, attempt to craft em once
 
     local breakdown, berr = ServerME.coinBreakdown(payload.amount)
@@ -76,8 +89,8 @@ function Transactions.withdrawRequest(payload, authResult, senderId)
         return false, berr or constants.ERROR.COINS_NOT_FOUND
     end
 
-    -- kill pending requests
-    Transactions.evictExpiredWithdraws()
+    -- Reserve the approved coins
+    ServerME.reserve(breakdown)
 
     pendingWithdraws[senderId] = {
         username = payload.username,
@@ -86,8 +99,8 @@ function Transactions.withdrawRequest(payload, authResult, senderId)
         expiresAt = utils.now() + PENDING_WITHDRAW_TTL_MS
     }
 
-    print(("[SRV][WITHDRAW] request approved for %s amount=%d (pending, no debit yet)"):format(payload.username,
-        payload.amount))
+    print(("[SRV][WITHDRAW] request approved for %s amount=%d (pending, reserved, no debit yet)"):format(
+        payload.username, payload.amount))
 
     return true, {
         breakdown = breakdown
@@ -118,31 +131,32 @@ function Transactions.withdrawConfirm(payload, authResult, senderId)
         return false, constants.ERROR.INVALID_PACKET   -- no matching request
     end
     if pending.expiresAt < utils.now() then
-        pendingWithdraws[senderId] = nil
+        dropPending(senderId)
         return false, constants.ERROR.INVALID_PACKET   -- request expired
     end
     if pending.username ~= payload.username or pending.amount ~= payload.amount then
-        pendingWithdraws[senderId] = nil
+        dropPending(senderId)
         return false, constants.ERROR.INVALID_PACKET
     end
 
     -- USER can only extract from their own account
     if resolved.permission == constants.PERMISSION.USER and payload.username ~= resolved.account.username then
-        pendingWithdraws[senderId] = nil
+        dropPending(senderId)
         return false, constants.ERROR.PERMISSION_DENIED
     end
 
     local acct = db.getAccount(payload.username)
     if not acct then
-        pendingWithdraws[senderId] = nil
+        dropPending(senderId)
         return false, constants.ERROR.ACCOUNT_NOT_FOUND
     end
     if acct.balance < payload.amount then
-        pendingWithdraws[senderId] = nil
+        dropPending(senderId)
         return false, constants.ERROR.INSUFFICIENT_FUNDS
     end
 
-    pendingWithdraws[senderId] = nil
+    -- Drop the pending request BEFORE persisting
+    dropPending(senderId)
 
     acct.balance = acct.balance - payload.amount
 
