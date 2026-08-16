@@ -12,6 +12,86 @@ local Transfer = {}
 
 local PLAYERS_PER_PAGE = 6
 
+--- Draw the amount entry step
+--- @param state     table shared state
+--- @param acct      table current user account
+--- @param recipient string target username
+--- @param message?  string optional error banner
+local function drawAmountStage(state, acct, recipient, message)
+    local mon = state.monitor
+    local lay = state.layout
+
+    mon.setBackgroundColor(colors.black)
+    mon.clear()
+
+    -- header
+    mon.setTextColor(colors.cyan)
+    mon.setCursorPos(3, lay.headerRow)
+    mon.write("Transfer")
+
+    mon.setTextColor(colors.white)
+    mon.setCursorPos(3, lay.headerRow + 1)
+    mon.write("To: " .. recipient)
+
+    -- message
+    if message then
+        mon.setTextColor(colors.yellow)
+        mon.setCursorPos(2, lay.headerRow + 2)
+        mon.write(message:sub(1, lay.width - 2))
+    end
+
+    state.inputBuffer = ""
+
+    -- keypad
+    Keypad.draw(mon, lay, state, {
+        fieldLabel = "Amount",
+        onConfirm = function()
+            local amount = tonumber(state.inputBuffer)
+            if not amount or amount <= 0 then
+                drawAmountStage(state, acct, recipient, "Invalid amount. Enter a positive number.")
+                return
+            end
+
+            local payload, err = Net.sendAndReceive(state, constants.PACKET.TRANSFER, {
+                from = acct.username,
+                to = recipient,
+                amount = amount
+            })
+
+            if not payload then
+                drawAmountStage(state, acct, recipient, "Network error: " .. tostring(err))
+                return
+            end
+
+            if not payload.success then
+                local code = payload.code or "UNKNOWN"
+                local friendly
+                if code == constants.ERROR.INSUFFICIENT_FUNDS then
+                    friendly = "Insufficient funds."
+                elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
+                    friendly = "Recipient '" .. recipient .. "' does not have a BlockBank account."
+                elseif code == constants.ERROR.PERMISSION_DENIED then
+                    friendly = "You can only transfer from your own account."
+                else
+                    friendly = "Error: " .. code
+                end
+                drawAmountStage(state, acct, recipient, friendly)
+                return
+            end
+
+            -- Success
+            acct.balance = payload.data.fromBalance
+            local successMsg = "Sent $" .. tostring(amount) .. " to " .. recipient .. ". New balance: $" ..
+                                   tostring(payload.data.fromBalance)
+            Router.switch(MainMenu, acct, successMsg)
+        end,
+        onCancel = function()
+            -- Go back to recipient selection
+            Transfer.draw(state, acct)
+        end
+    })
+end
+
 --- u know it, draw it!
 --- @param state    table shared state
 --- @param acct     table current user account
@@ -125,86 +205,6 @@ local function drawRecipientStage(state, acct, players, page, message)
         bg = colors.red,
         fg = colors.white
     })):draw(mon)
-end
-
---- Draw the amount entry step
---- @param state     table shared state
---- @param acct      table current user account
---- @param recipient string target username
---- @param message?  string optional error banner
-local function drawAmountStage(state, acct, recipient, message)
-    local mon = state.monitor
-    local lay = state.layout
-
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
-
-    -- header
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Transfer")
-
-    mon.setTextColor(colors.white)
-    mon.setCursorPos(3, lay.headerRow + 1)
-    mon.write("To: " .. recipient)
-
-    -- message
-    if message then
-        mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, lay.headerRow + 2)
-        mon.write(message:sub(1, lay.width - 2))
-    end
-
-    state.inputBuffer = ""
-
-    -- keypad
-    Keypad.draw(mon, lay, state, {
-        fieldLabel = "Amount",
-        onConfirm = function()
-            local amount = tonumber(state.inputBuffer)
-            if not amount or amount <= 0 then
-                drawAmountStage(state, acct, recipient, "Invalid amount. Enter a positive number.")
-                return
-            end
-
-            local payload, err = Net.sendAndReceive(state, constants.PACKET.TRANSFER, {
-                from = acct.username,
-                to = recipient,
-                amount = amount
-            })
-
-            if not payload then
-                drawAmountStage(state, acct, recipient, "Network error: " .. tostring(err))
-                return
-            end
-
-            if not payload.success then
-                local code = payload.code or "UNKNOWN"
-                local friendly
-                if code == constants.ERROR.INSUFFICIENT_FUNDS then
-                    friendly = "Insufficient funds."
-                elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
-                    friendly = "Recipient '" .. recipient .. "' does not have a BlockBank account."
-                elseif code == constants.ERROR.PERMISSION_DENIED then
-                    friendly = "You can only transfer from your own account."
-                else
-                    friendly = "Error: " .. code
-                end
-                drawAmountStage(state, acct, recipient, friendly)
-                return
-            end
-
-            -- Success
-            acct.balance = payload.data.fromBalance
-            local successMsg = "Sent $" .. tostring(amount) .. " to " .. recipient .. ". New balance: $" ..
-                                   tostring(payload.data.fromBalance)
-            Router.switch(MainMenu, acct, successMsg)
-        end,
-        onCancel = function()
-            -- Go back to recipient selection
-            Transfer.draw(state, acct)
-        end
-    })
 end
 
 
