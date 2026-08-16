@@ -165,7 +165,7 @@ function Withdraw.draw(state, acct, target, message)
             local payload, err = Net.sendAndReceive(state, constants.PACKET.WITHDRAW_REQUEST, {
                 username = targetUser,
                 amount = amount
-            })
+            }, 30)
 
             if not payload then
                 Withdraw.draw(state, acct, targetUser, "Network error: " .. tostring(err))
@@ -179,6 +179,12 @@ function Withdraw.draw(state, acct, target, message)
                     friendly = "Insufficient funds."
                 elseif code == constants.ERROR.COINS_NOT_FOUND then
                     friendly = "Not enough coins in the vault to make exact change."
+                elseif code == constants.ERROR.ME_CRAFT_UNAVAILABLE then
+                    friendly = "The vault can't mint the needed coins right now."
+                elseif code == constants.ERROR.ME_CRAFT_TIMEOUT then
+                    friendly = "Minting coins took too long. Please try again."
+                elseif code == constants.ERROR.ME_CRAFT_FAILED then
+                    friendly = "Minting coins failed. Please try again."
                 elseif code == constants.ERROR.PERMISSION_DENIED then
                     friendly = "You can only withdraw from your own account."
                 elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then

@@ -5,6 +5,8 @@ end
 local chatHandler = require "server.chat_handler"
 local packet = require "shared.packet"
 local Peripheral = require "shared.peripheral"
+local constants = require "shared.constants"
+local ServerME = require "server.me"
 
 local PROTOCOL = "ccbank"
 
@@ -107,6 +109,7 @@ function M.pumpOnce(protocolInstance, timeout)
 end
 
 function M.serveForever(protocolInstance)
+    local maintenanceTimer = os.startTimer(constants.MAINTENANCE_INTERVAL_MS / 1000)
     while true do
         local event = {os.pullEventRaw()}
         local eventName = event[1]
@@ -117,6 +120,10 @@ function M.serveForever(protocolInstance)
         elseif eventName == "chat" then
             -- Advanced Peripherals chat event: "chat", username, message, uuid, isHidden, messageUtf8
             handleChatEvent(protocolInstance, event[3], event[2])
+
+        elseif eventName == "timer" and event[2] == maintenanceTimer then
+            ServerME.maintainStock()
+            maintenanceTimer = os.startTimer(constants.MAINTENANCE_INTERVAL_MS / 1000)
 
         elseif eventName == "terminate" then
             print("[NET] Terminate event received. Shutting down.")

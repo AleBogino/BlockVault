@@ -111,6 +111,18 @@ M.ME_BUFFER_NAME = nil
 -- which side of the server me bridge touches the buffer barrel
 M.ME_BUFFER_SIDE = "up"
 
+-- AE2 auto-crafting
+-- craft missing coins?
+M.CRAFT_ENABLED = true
+-- Max time (ms) the server waits for crafted coins to land before failing a withdraw.
+M.CRAFT_TIMEOUT_MS = 15000
+-- Poll interval (ms) while waiting for a craft job to finish.
+M.CRAFT_POLL_MS = 100
+-- Proactive stock target for every denomination except netherite.
+M.CRAFT_STOCK_TARGET = 8
+-- How often (ms) the proactive maintenance loop runs.
+M.MAINTENANCE_INTERVAL_MS = 20000
+
 -- error codes
 M.ERROR = {
     INVALID_SIGNATURE = "INVALID_SIGNATURE",
@@ -134,6 +146,9 @@ M.ERROR = {
     ME_EXPORT_FAILED = "ME_EXPORT_FAILED",
     COINS_NOT_FOUND = "COINS_NOT_FOUND",
     NO_INVENTORY = "NO_INVENTORY",
+    ME_CRAFT_FAILED = "ME_CRAFT_FAILED",
+    ME_CRAFT_TIMEOUT = "ME_CRAFT_TIMEOUT",
+    ME_CRAFT_UNAVAILABLE = "ME_CRAFT_UNAVAILABLE",
 }
 
 -- payload schema

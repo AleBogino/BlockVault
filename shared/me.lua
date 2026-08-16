@@ -96,6 +96,76 @@ function ME.listCoins(me)
     return out
 end
 
+--- Ascending denomination order (zinc..netherite), cached.
+--- @return table coinIds
+local denomCache = nil
+function ME.denominations()
+    if denomCache then return denomCache end
+    denomCache = {}
+    for i = #constants.COIN_ORDER, 1, -1 do
+        denomCache[#denomCache + 1] = constants.COIN_ORDER[i]
+    end
+    return denomCache
+end
+
+--- True if the denomination has a crafting pattern on the network.
+function ME.isCoinCraftable(me, coinId)
+    if not me or not ME.isConnected(me) then return false end
+    local ok, item, err = pcall(function() return me.getItem({ name = coinId }) end)
+    if not ok or err then return false end
+    return type(item) == "table" and item.isCraftable == true
+end
+
+--- Request AE2 to craft `count` of `coinId` (optional crafting CPU name).
+--- @return boolean ok
+--- @return string|nil err
+function ME.craftItem(me, coinId, count, cpuName)
+    if not me then return false, constants.ERROR.NO_ME_BRIDGE end
+    if not ME.isConnected(me) then return false, constants.ERROR.ME_NOT_CONNECTED end
+    local filter = { name = coinId, count = count }
+    local ok, res, err = pcall(function()
+        if cpuName then
+            return me.craftItem(filter, cpuName)
+        end
+        return me.craftItem(filter)
+    end)
+    if not ok then
+        return false, tostring(res)
+    end
+    if err then
+        return false, tostring(err)
+    end
+    -- res may be true even when no job started (AP quirk). Stock polling in the
+    -- executor is the real completion check.
+    return res ~= false, nil
+end
+
+--- True if a crafting job for `coinId` is currently running.
+function ME.isCrafting(me, coinId)
+    if not me or not ME.isConnected(me) then return false end
+    local ok, res = pcall(function() return me.isItemCrafting({ name = coinId }) end)
+    return ok == true and res == true
+end
+
+--- List of crafting CPUs, or an empty table.
+function ME.getCraftingCPUs(me)
+    if not me then return {} end
+    local ok, res = pcall(function() return me.getCraftingCPUs() end)
+    if ok and type(res) == "table" then return res end
+    return {}
+end
+
+--- Name of the first non-busy crafting CPU, or nil (let AE2 pick).
+function ME.pickCraftingCpu(me)
+    for _, cpu in pairs(ME.getCraftingCPUs(me)) do
+        if type(cpu) == "table" and cpu.isBusy ~= true then
+            if type(cpu.name) == "string" then return cpu.name end
+            return nil
+        end
+    end
+    return nil
+end
+
 -- calculate minimum number of coins for target value
 -- largest denomination first
 --- @param target number total value to dispense, in account units
@@ -133,6 +203,94 @@ function ME.makeChange(target, available)
     end
 
     return breakdown, target
+end
+
+--- Calculate min crafts neccesary for `target` reachable from `available`
+--- Feasible iff total vault value >= target
+--- @param target number value to make change for
+--- @param available table { [coinId] = count }
+--- @return table|nil craft { [coinId] = count to request via craftItem }
+function ME.planChange(target, available)
+    if type(target) ~= "number" or target <= 0 then
+        return nil
+    end
+    available = available or {}
+
+    local denom = ME.denominations()          -- zinc..netherite
+    local n = #denom
+    local value = {}
+    for i = 1, n do
+        value[i] = constants.COIN_VALUES[denom[i]] or 0
+    end
+
+    -- Ideal (minimal) breakdown: base-9 digits, netherite unrestricted.
+    local D = {}
+    for i = 1, n do
+        D[i] = math.floor(target / value[i]) % 9
+    end
+    D[n] = math.floor(target / value[n])
+
+    local S = {}
+    local total = 0
+    for i = 1, n do
+        S[i] = available[denom[i]] or 0
+        total = total + S[i] * value[i]
+    end
+    if total < target then
+        return nil
+    end
+
+    local craft = {}
+
+    local function nearestSurplusAbove(i)
+        for j = i + 1, n do
+            if S[j] > D[j] then return j end
+        end
+        return nil
+    end
+
+    local safety = 10000
+    local changed = true
+    while changed and safety > 0 do
+        safety = safety - 1
+        changed = false
+
+        -- Pass 1: satisfy high deficits by combining up (exact, no waste).
+        for i = n, 2, -1 do
+            while S[i] < D[i] do
+                if S[i - 1] >= D[i - 1] + 9 then
+                    S[i - 1] = S[i - 1] - 9
+                    S[i] = S[i] + 1
+                    craft[denom[i]] = (craft[denom[i]] or 0) + 1
+                    changed = true
+                else
+                    break
+                end
+            end
+        end
+
+        -- Pass 2: satisfy low deficits by splitting down from the nearest
+        -- surplus denomination above (one 1->9 recipe; AE2 chains it).
+        for i = 1, n - 1 do
+            while S[i] < D[i] do
+                local j = nearestSurplusAbove(i)
+                if not j then break end
+                S[j] = S[j] - 1
+                for m = j - 1, i + 1, -1 do
+                    S[m] = S[m] + 8
+                end
+                S[i] = S[i] + 9
+                craft[denom[i]] = (craft[denom[i]] or 0) + 9
+                changed = true
+            end
+        end
+    end
+
+    for i = 1, n do
+        if S[i] < D[i] then return nil end
+    end
+
+    return craft
 end
 
 --- Import `wanted` coin counts from the inventory on `side` of the ME Bridge.

@@ -85,8 +85,6 @@ function Transactions.withdrawRequest(payload, authResult, senderId)
     Transactions.evictExpiredWithdraws()
     dropPending(senderId)
 
-    -- TODO if coinBreakdown returns COINS_NOT_FOUND, attempt to craft em once
-
     local breakdown, berr = ServerME.coinBreakdown(payload.amount)
     if not breakdown then
         return false, berr or constants.ERROR.COINS_NOT_FOUND

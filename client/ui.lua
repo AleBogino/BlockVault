@@ -26,6 +26,7 @@ function UI.run(state)
 
     -- pin text scale 0.5
     -- monitor size 15 columns x 24 rows.
+    -- monitor borders take 3 pixels horizontally, and 2 pixels vertically. 
     pcall(function() state.monitor.setTextScale(0.5) end)
     state.monitor.setBackgroundColor(colors.black)
 

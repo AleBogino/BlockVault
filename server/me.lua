@@ -183,6 +183,17 @@ local function netAvailable(available)
     return net
 end
 
+--- Net-available coins (subtracts the reservation ledger).
+local function netListCoins()
+    if not bridge then return {} end
+    return netAvailable(ME.listCoins(bridge))
+end
+
+--- Try to make exact change from what the vault currently holds.
+local function tryBreakdown(target)
+    return ME.makeChange(target, netListCoins())
+end
+
 --- Add breakdown to reserved coins
 function ServerME.reserve(breakdown)
     for coinId, count in pairs(breakdown or {}) do
@@ -258,21 +269,150 @@ function ServerME.sweepBuffer(breakdown)
     return swept
 end
 
---- Coin breakdown for a target value (using what we have)
+--- Coin breakdown for a target value, crafting missing coins when needed.
+--- @return table|nil breakdown { [coinId] = count }
+--- @return string|nil error
 function ServerME.coinBreakdown(target)
     if not bridge then
         print("[SRV][ME] coinBreakdown: no bridge configured")
         return nil, constants.ERROR.NO_ME_BRIDGE
     end
-    local available = ME.listCoins(bridge)
-    local net = netAvailable(available)
-    local breakdown = ME.makeChange(target, net)
-    if not breakdown then
-        print(("[SRV][ME] coinBreakdown: cannot make exact change for %d (available=%s reserved=%s)"):format(target,
-            dump(net), dump(reserved)))
+
+    local breakdown = tryBreakdown(target)
+    if breakdown then
+        return breakdown, nil
+    end
+
+    if not constants.CRAFT_ENABLED then
+        print(("[SRV][ME] coinBreakdown: cannot make exact change for %d and crafting disabled"):format(target))
         return nil, constants.ERROR.COINS_NOT_FOUND
     end
-    return breakdown, nil
+
+    local deadline = os.epoch("utc") + constants.CRAFT_TIMEOUT_MS
+    local cpu = ME.pickCraftingCpu(bridge)
+
+    for attemptNo = 1, 3 do
+        local plan = ME.planChange(target, netListCoins())
+        if not plan or not next(plan) then
+            print(("[SRV][ME] coinBreakdown: no craft plan for %d"):format(target))
+            return nil, constants.ERROR.COINS_NOT_FOUND
+        end
+
+        -- Always re-check live stock before requesting a craft.
+        local issued = false
+        for _, coinId in ipairs(constants.COIN_ORDER) do
+            local want = plan[coinId]
+            if want and want > 0 then
+                local have, rerr = ME.getCoinCount(bridge, coinId)
+                if rerr then
+                    print(("[SRV][ME] coinBreakdown: read failed for %s: %s"):format(coinId, tostring(rerr)))
+                    return nil, constants.ERROR.ME_READ_FAILED
+                end
+                if have < want then
+                    if not ME.isCoinCraftable(bridge, coinId) then
+                        print(("[SRV][ME] coinBreakdown: %s not craftable"):format(coinId))
+                        return nil, constants.ERROR.ME_CRAFT_UNAVAILABLE
+                    end
+                    local ok, err = ME.craftItem(bridge, coinId, want, cpu)
+                    if not ok then
+                        print(("[SRV][ME] coinBreakdown: craft %s x%d failed: %s"):format(coinId, want, tostring(err)))
+                        return nil, constants.ERROR.ME_CRAFT_FAILED
+                    end
+                    print(("[SRV][ME] coinBreakdown: requested %s x%d (attempt %d)"):format(coinId, want, attemptNo))
+                    issued = true
+                end
+            end
+        end
+
+        if not issued then
+            return nil, constants.ERROR.ME_CRAFT_FAILED
+        end
+
+        -- Wait for the crafted coins to land
+        while os.epoch("utc") < deadline do
+            local allOk = true
+            for coinId, want in pairs(plan) do
+                local have = ME.getCoinCount(bridge, coinId)
+                if have < want then
+                    allOk = false
+                end
+            end
+            if allOk then
+                break
+            end
+            os.sleep(constants.CRAFT_POLL_MS / 1000)
+        end
+
+        local b = tryBreakdown(target)
+        if b then
+            print(("[SRV][ME] coinBreakdown: crafted change for %d"):format(target))
+            return b, nil
+        end
+        if os.epoch("utc") >= deadline then
+            print(("[SRV][ME] coinBreakdown: crafting timed out for %d"):format(target))
+            return nil, constants.ERROR.ME_CRAFT_TIMEOUT
+        end
+    end
+
+    print(("[SRV][ME] coinBreakdown: giving up on %d after 3 craft attempts"):format(target))
+    return nil, constants.ERROR.COINS_NOT_FOUND
+end
+
+--- keep CRAFT_STOCK_TARGET of every denomination except netherite
+function ServerME.maintainStock()
+    if not bridge or not constants.CRAFT_ENABLED then
+        return
+    end
+
+    local denoms = ME.denominations()          -- zinc..netherite
+    local available = ME.listCoins(bridge)
+    local target = constants.CRAFT_STOCK_TARGET
+
+    for i = 1, #denoms do
+        if ME.isCrafting(bridge, denoms[i]) then
+            return
+        end
+    end
+
+    -- Most-depleted small denomination
+    local bestIdx = nil
+    for i = 1, #denoms - 1 do
+        local have = available[denoms[i]] or 0
+        if have < target then
+            if not bestIdx or have < (available[denoms[bestIdx]] or 0) then
+                bestIdx = i
+            end
+        end
+    end
+    if not bestIdx then
+        return
+    end
+
+    local cpu = ME.pickCraftingCpu(bridge)
+    local coinId = denoms[bestIdx]
+
+    -- 1) Split down from the nearest surplus above (one 1->9 recipe).
+    for j = bestIdx + 1, #denoms do
+        if (available[denoms[j]] or 0) > target then
+            local ok, err = ME.craftItem(bridge, coinId, 9, cpu)
+            if ok then
+                print(("[SRV][ME] maintainStock: split %s -> 9x %s"):format(denoms[j], coinId))
+            else
+                print(("[SRV][ME] maintainStock: split into %s failed: %s"):format(coinId, tostring(err)))
+            end
+            return
+        end
+    end
+
+    -- 2) Combine up from the next smaller denomination (9 -> 1).
+    if bestIdx > 1 and (available[denoms[bestIdx - 1]] or 0) >= target + 9 then
+        local ok, err = ME.craftItem(bridge, coinId, 1, cpu)
+        if ok then
+            print(("[SRV][ME] maintainStock: combined 9x %s -> 1x %s"):format(denoms[bestIdx - 1], coinId))
+        else
+            print(("[SRV][ME] maintainStock: combine into %s failed: %s"):format(coinId, tostring(err)))
+        end
+    end
 end
 
 return ServerME
