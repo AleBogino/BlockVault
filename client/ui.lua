@@ -7,11 +7,12 @@ local Router = require "client.ui.router"
 local Layout = require "client.ui.layout"
 
 local Screens = {
-    rest      = require "client.ui.screens.rest",
-    mainMenu  = require "client.ui.screens.main_menu",
-    deposit   = require "client.ui.screens.deposit",
-    withdraw  = require "client.ui.screens.withdraw",
-    transfer  = require "client.ui.screens.transfer",
+    rest       = require "client.ui.screens.rest",
+    mainMenu   = require "client.ui.screens.main_menu",
+    deposit    = require "client.ui.screens.deposit",
+    withdraw   = require "client.ui.screens.withdraw",
+    transfer   = require "client.ui.screens.transfer",
+    fatalError = require "client.ui.screens.fatal_error",
 }
 
 local UI = {}

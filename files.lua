@@ -118,6 +118,9 @@ files.client = {
         path = "client/ui/screens/deposit.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/deposit.lua"
     }, {
+        path = "client/ui/screens/fatal_error.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/fatal_error.lua"
+    }, {
         path = "client/ui/screens/main_menu.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/screens/main_menu.lua"
     }, {
