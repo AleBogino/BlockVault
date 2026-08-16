@@ -12,18 +12,16 @@ local M = {}
  
 M.PROTOCOL = PROTOCOL
  
+local Peripheral = require "shared.peripheral"
+
 function M.open()
     if rednet.isOpen() then return true end
-    local modemSide = nil
-    for _, side in ipairs(peripheral.getNames()) do
-        if peripheral.getType(side) == "modem" then
-            modemSide = side
-            break
-        end
-    end
+    local cat = Peripheral.scan()
+    local modemSide = Peripheral.pickModem(cat)
     if not modemSide then
-        return false, "no modem attached to this computer"
+        return false, "no wireless modem attached to this computer"
     end
+    print("[CLI-NET] Opening wireless modem on " .. tostring(modemSide))
     rednet.open(modemSide)
     return true
 end
