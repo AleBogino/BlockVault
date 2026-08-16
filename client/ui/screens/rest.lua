@@ -57,11 +57,11 @@ function Rest.draw(state, message)
     end
 
     -- Start button
-    local btnW = 9
+    local btnW = 11
     local btnX = math.floor((lay.width - btnW) / 2) + 1
     local btnY = 12
     ScreenManager.register(Button.new(
-        btnX, btnY, btnX + btnW - 1, btnY + 1,
+        btnX, btnY, btnX + btnW - 1, btnY + 2,
         "  Start  ",
         function()
             Rest.startLogin(state)

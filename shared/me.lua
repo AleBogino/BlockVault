@@ -151,7 +151,6 @@ function ME.getCraftingCPUs(me)
     return {}
 end
 
-
 -- calculate minimum number of coins for target value
 -- largest denomination first
 --- @param target number total value to dispense, in account units

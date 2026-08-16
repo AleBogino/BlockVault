@@ -126,8 +126,8 @@ local function drawConfirm(state, acct, breakdown, total)
 
                 -- 1) Import coins from the barrel (adjacent to the ME Bridge on state.meSide)
                 local imported, importedValue, importErrs = ME.importCoins(me, state.meSide, breakdown)
-                print(("[CLI][DEPOSIT] import result: value=%d imported=%s errors=%s")
-                    :format(importedValue or 0, textutils.serialize(imported or {}), textutils.serialize(importErrs or {})))
+                print(("[CLI][DEPOSIT] import result: value=%d imported=%s errors=%s"):format(importedValue or 0,
+                    textutils.serialize(imported or {}), textutils.serialize(importErrs or {})))
 
                 if importedValue <= 0 then
                     local why = "No coins were imported."
@@ -174,6 +174,7 @@ local function drawConfirm(state, acct, breakdown, total)
             })):draw(mon)
     end
 
+    -- cancel button
     ScreenManager.register(Button.new(bx, lay.confirmButtonRow, bx + btnW - 1, lay.confirmButtonRow, "  Cancel  ",
         function()
             Deposit.draw(state, acct, PHASE.INSERT)

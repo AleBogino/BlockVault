@@ -13,7 +13,7 @@ function Layout.compute(mon)
         inputFieldRow = math.max(2, h - 9),
         keypadOriginX = math.max(1, math.floor(w / 2) - 6),
         keypadOriginY = math.max(4, h - 7),
-        confirmButtonRow = math.max(2, h - 1),
+        confirmButtonRow = math.max(2, h - 2),
     }
 end
 
