@@ -39,16 +39,21 @@ function Button:draw(mon)
     mon.setBackgroundColor(self.bg)
     mon.setTextColor(self.fg)
     -- rectangle
-    local fill = string.rep(" ", self.x2 - self.x1 + 1)
+    local w = self.x2 - self.x1 + 1
+    local fill = string.rep(" ", w)
     for row = self.y1, self.y2 do
         mon.setCursorPos(self.x1, row)
         mon.write(fill)
     end
-    -- text
+    -- text (clamped to the button width)
+    local label = self.label
+    if #label > w then
+        label = label:sub(1, w)
+    end
     local midRow = math.floor((self.y1 + self.y2) / 2)
-    local midCol = self.x1 + math.floor(((self.x2 - self.x1 + 1) - #self.label) / 2)
+    local midCol = self.x1 + math.floor((w - #label) / 2)
     mon.setCursorPos(midCol, midRow)
-    mon.write(self.label)
+    mon.write(label)
 end
 
 return Button

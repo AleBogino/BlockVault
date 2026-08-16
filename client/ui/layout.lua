@@ -10,10 +10,10 @@ function Layout.compute(mon)
         width  = w,
         height = h,
         headerRow = 2,
-        inputFieldRow = h - 9,
-        keypadOriginX = math.floor(w / 2) - 6,
-        keypadOriginY = h - 7,
-        confirmButtonRow = h - 1,
+        inputFieldRow = math.max(2, h - 9),
+        keypadOriginX = math.max(1, math.floor(w / 2) - 6),
+        keypadOriginY = math.max(4, h - 7),
+        confirmButtonRow = math.max(2, h - 1),
     }
 end
 

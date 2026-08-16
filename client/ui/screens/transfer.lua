@@ -10,7 +10,7 @@ local MainMenu = require "client.ui.screens.main_menu"
 
 local Transfer = {}
 
-local PLAYERS_PER_PAGE = 6
+local MAX_PLAYERS_PER_PAGE = 6
 
 --- Draw the amount entry step
 --- @param state     table shared state
@@ -122,9 +122,11 @@ local function drawRecipientStage(state, acct, players, page, message)
     end
 
     -- Player list
-    local startPage = (page - 1) * PLAYERS_PER_PAGE + 1
-    local endPage = math.min(page * PLAYERS_PER_PAGE, #players)
-    local listY = lay.keypadOriginY - 1
+    local listY = lay.headerRow + 3
+    local listBottom = lay.confirmButtonRow - 3
+    local playersPerPage = math.max(1, math.min(MAX_PLAYERS_PER_PAGE, math.floor((listBottom - listY + 1) / 2)))
+    local startPage = (page - 1) * playersPerPage + 1
+    local endPage = math.min(page * playersPerPage, #players)
 
     if #players == 0 then
         mon.setTextColor(colors.red)
@@ -138,7 +140,7 @@ local function drawRecipientStage(state, acct, players, page, message)
                 -- Skip self
                 goto continue
             end
-            local label = " " .. name .. string.rep(" ", 20 - #name)
+            local label = (" " .. name):sub(1, math.max(1, lay.width - 4))
             mon.setTextColor(colors.white)
             mon.setCursorPos(4, row)
             mon.write(label)
@@ -159,7 +161,7 @@ local function drawRecipientStage(state, acct, players, page, message)
             mon.setBackgroundColor(colors.black)
 
             row = row + 2
-            if row > lay.keypadOriginY + 8 then
+            if row + 1 > listBottom then
                 break
             end
             ::continue::
@@ -167,7 +169,7 @@ local function drawRecipientStage(state, acct, players, page, message)
     end
 
     -- Pagination
-    local totalPages = math.ceil(#players / PLAYERS_PER_PAGE)
+    local totalPages = math.ceil(#players / playersPerPage)
     if totalPages > 1 then
         -- Prev page
         if page > 1 then

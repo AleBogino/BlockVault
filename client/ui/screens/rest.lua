@@ -5,6 +5,7 @@ end
 local Button = require "client.ui.button"
 local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
+local Layout = require "client.ui.layout"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
 local packet = require "shared.packet"
@@ -15,6 +16,7 @@ local Rest = {}
 
 -- How long to wait for LOGIN_OK after receiving the code (seconds)
 local LOGIN_TIMEOUT = 30
+local LOGIN_REDRAW_INTERVAL = 2
 
 --- Draw da screen
 --- @param state table shared state
@@ -23,6 +25,10 @@ function Rest.draw(state, message)
     local mon = state.monitor
     local lay = state.layout
 
+    local function centerCol(text)
+        return math.max(1, math.floor((lay.width - #text) / 2) + 1)
+    end
+
     ScreenManager.reset()
     mon.setBackgroundColor(colors.black)
     mon.clear()
@@ -30,22 +36,25 @@ function Rest.draw(state, message)
     -- Title
     local title = "BlockBank ATM"
     mon.setTextColor(colors.cyan)
-    local titleCol = math.floor((lay.width - #title) / 2) + 1
-    mon.setCursorPos(titleCol, 4)
+    mon.setCursorPos(centerCol(title), 4)
     mon.write(title)
 
     -- Tagline
-    local tagline = "Give us your money, we'll keep it."
+    local tagline
+    if lay.width >= 32 then
+        tagline = "Give us your money, we'll keep it."
+    else
+        tagline = "Coin banking"
+    end
     mon.setTextColor(colors.lightGray)
-    local tagCol = math.floor((lay.width - #tagline) / 2) + 1
-    mon.setCursorPos(tagCol, 6)
+    mon.setCursorPos(centerCol(tagline), 6)
     mon.write(tagline)
 
     -- Status message
     if message then
+        message = tostring(message):sub(1, lay.width)
         mon.setTextColor(colors.yellow)
-        local msgCol = math.floor((lay.width - #message) / 2) + 1
-        mon.setCursorPos(msgCol, 9)
+        mon.setCursorPos(centerCol(message), 9)
         mon.write(message)
     end
 
@@ -63,12 +72,63 @@ function Rest.draw(state, message)
     )):draw(mon)
 end
 
---- Initiate the chat-based login flow
+--- Draw the "wait for chat login" screen
 --- @param state table shared state
-function Rest.startLogin(state)
+--- @param loginCode string the code the player must type in chat
+--- @param flags table { cancelled = boolean } shared with the login loop
+local function drawLoginWait(state, loginCode, flags)
     local mon = state.monitor
     local lay = state.layout
 
+    local function centerCol(text)
+        return math.max(1, math.floor((lay.width - #text) / 2) + 1)
+    end
+
+    mon.setBackgroundColor(colors.black)
+    mon.clear()
+
+    mon.setTextColor(colors.cyan)
+    local title = "BlockBank ATM"
+    mon.setCursorPos(centerCol(title), 3)
+    mon.write(title)
+
+    mon.setTextColor(colors.white)
+    local instruction = "Type in chat:"
+    mon.setCursorPos(centerCol(instruction), 5)
+    mon.write(instruction)
+
+    -- Split the command so the 4-char code is never clipped on narrow screens
+    local cmdPrefix = ".bvault login"
+    mon.setTextColor(colors.green)
+    mon.setBackgroundColor(colors.gray)
+    mon.setCursorPos(centerCol(cmdPrefix), 7)
+    mon.write(cmdPrefix)
+
+    mon.setCursorPos(centerCol(loginCode), 8)
+    mon.write(loginCode)
+    mon.setBackgroundColor(colors.black)
+
+    mon.setTextColor(colors.lightGray)
+    local hint = "Waiting for chat"
+    mon.setCursorPos(centerCol(hint), 10)
+    mon.write(hint)
+
+    local btnW = 9
+    local btnX = math.floor((lay.width - btnW) / 2) + 1
+    ScreenManager.reset()
+    ScreenManager.register(Button.new(
+        btnX, 12, btnX + btnW - 1, 13,
+        "  Cancel  ",
+        function()
+            flags.cancelled = true
+        end,
+        { bg = colors.gray, fg = colors.white }
+    )):draw(mon)
+end
+
+--- Initiate the chat-based login flow
+--- @param state table shared state
+function Rest.startLogin(state)
     -- Step 1: Send LOGIN_REQUEST
     Rest.draw(state, "Connecting to server...")
 
@@ -102,59 +162,18 @@ function Rest.startLogin(state)
     end
 
     -- Step 3: Display the code and wait for user to type it in chat
-    local instruction = "Type in chat:"
-    local command = ".bvault login " .. loginCode
-
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
-
-    mon.setTextColor(colors.cyan)
-    local title = "BlockBank ATM"
-    local titleCol = math.floor((lay.width - #title) / 2) + 1
-    mon.setCursorPos(titleCol, 3)
-    mon.write(title)
-
-    mon.setTextColor(colors.white)
-    local instrCol = math.floor((lay.width - #instruction) / 2) + 1
-    mon.setCursorPos(instrCol, 5)
-    mon.write(instruction)
-
-    -- Display the command prominently
-    mon.setTextColor(colors.green)
-    mon.setBackgroundColor(colors.gray)
-    local cmdCol = math.floor((lay.width - #command) / 2) + 1
-    mon.setCursorPos(cmdCol, 7)
-    mon.write(command)
-    mon.setBackgroundColor(colors.black)
-
-    mon.setTextColor(colors.lightGray)
-    local hint = "Waiting for chat command..."
-    local hintCol = math.floor((lay.width - #hint) / 2) + 1
-    mon.setCursorPos(hintCol, 9)
-    mon.write(hint)
-
-    -- Cancel button
-    local btnW = 9
-    local btnX = math.floor((lay.width - btnW) / 2) + 1
-    ScreenManager.reset()
-    local cancelled = false
-    ScreenManager.register(Button.new(
-        btnX, 12, btnX + btnW - 1, 13,
-        "  Cancel  ",
-        function()
-            cancelled = true
-        end,
-        { bg = colors.gray, fg = colors.white }
-    )):draw(mon)
+    local flags = { cancelled = false }
+    drawLoginWait(state, loginCode, flags)
 
     -- Step 4: Wait for LOGIN_OK / LOGIN_FAIL / LOGIN_TIMEOUT, or a tap on Cancel.
     local loginTimer = os.startTimer(LOGIN_TIMEOUT)
+    local redrawTimer = os.startTimer(LOGIN_REDRAW_INTERVAL)
     while true do
         local event, p1, p2, p3 = os.pullEvent()
 
         if event == "monitor_touch" then
             ScreenManager.dispatch(p2, p3)
-            if cancelled then
+            if flags.cancelled then
                 break
             end
 
@@ -184,6 +203,16 @@ function Rest.startLogin(state)
         elseif event == "timer" and p1 == loginTimer then
             Rest.draw(state, "Login timed out. Please try again.")
             return
+
+        elseif event == "timer" and p1 == redrawTimer then
+            local m = state.refreshMonitor and state.refreshMonitor() or state.monitor
+            if m then
+                state.monitor = m
+                local okLay, newLay = pcall(Layout.compute, m)
+                if okLay then state.layout = newLay end
+                drawLoginWait(state, loginCode, flags)
+            end
+            redrawTimer = os.startTimer(LOGIN_REDRAW_INTERVAL)
         end
     end
 
@@ -197,27 +226,33 @@ function Rest.drawCreateAccountPrompt(state, username)
     local mon = state.monitor
     local lay = state.layout
 
+    local function centerCol(text)
+        return math.max(1, math.floor((lay.width - #text) / 2) + 1)
+    end
+
     mon.setBackgroundColor(colors.black)
     mon.clear()
 
     mon.setTextColor(colors.yellow)
-    local msg = "No account found for " .. username
-    local col = math.floor((lay.width - #msg) / 2) + 1
-    mon.setCursorPos(col, 4)
+    local msg = ("No account for " .. username):sub(1, lay.width)
+    mon.setCursorPos(centerCol(msg), 4)
     mon.write(msg)
 
     local msg2 = "Create one?"
-    col = math.floor((lay.width - #msg2) / 2) + 1
-    mon.setCursorPos(col, 6)
+    mon.setCursorPos(centerCol(msg2), 6)
     mon.write(msg2)
 
     -- Create Account button
-    local btnW = 16
+    local btnW = math.min(16, lay.width)
     local btnX = math.floor((lay.width - btnW) / 2) + 1
+    local createLabel = "Create Account"
+    if #createLabel > btnW then
+        createLabel = createLabel:sub(1, btnW)
+    end
     ScreenManager.reset()
     ScreenManager.register(Button.new(
         btnX, 9, btnX + btnW - 1, 10,
-        "Create Account",
+        createLabel,
         function()
             local payload, err = Net.sendAndReceive(state, constants.PACKET.CREATE_ACCOUNT, {
                 username = username,

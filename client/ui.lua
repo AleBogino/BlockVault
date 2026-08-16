@@ -24,6 +24,11 @@ function UI.run(state)
         error("BlockBank ATM requires an Advanced Monitor peripheral.")
     end
 
+    -- pin text scale 0.5
+    -- monitor size 15 columns x 24 rows.
+    pcall(function() state.monitor.setTextScale(0.5) end)
+    state.monitor.setBackgroundColor(colors.black)
+
     state.layout = Layout.compute(state.monitor)
     state.inputBuffer = ""
     state.screens = Screens

@@ -106,17 +106,17 @@ local function drawConfirm(state, acct, breakdown, total)
         end
 
         mon.setTextColor(colors.lime)
-        mon.setCursorPos(3, y)
-        mon.write(("Total: %d units"):format(total))
+        mon.setCursorPos(2, y)
+        mon.write(("Total: %d"):format(total):sub(1, lay.width - 2))
         y = y + 1
     end
 
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, y)
-    mon.write(("Current balance: %d"):format(acct.balance or 0))
+    mon.setCursorPos(2, y)
+    mon.write(("Balance: %d"):format(acct.balance or 0):sub(1, lay.width - 2))
     y = y + 1
-    mon.setCursorPos(3, y)
-    mon.write(("After deposit:   %d"):format((acct.balance or 0) + total))
+    mon.setCursorPos(2, y)
+    mon.write(("After: %d"):format((acct.balance or 0) + total):sub(1, lay.width - 2))
     y = y + 1
 
     local available = state.inventoryMgr ~= nil and state.meBridge ~= nil

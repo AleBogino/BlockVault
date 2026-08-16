@@ -29,29 +29,29 @@ local function drawReview(state, acct, amount, breakdown)
 
     local y = lay.headerRow + 1
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, y)
-    mon.write(("Amount: %d units"):format(amount))
+    mon.setCursorPos(2, y)
+    mon.write(("Amt: %d"):format(amount):sub(1, lay.width - 2))
     y = y + 1
-    mon.setCursorPos(3, y)
-    mon.write("Coins to dispense:")
+    mon.setCursorPos(2, y)
+    mon.write(("Coins:"):sub(1, lay.width - 2))
     y = y + 1
 
     for _, coinId in ipairs(constants.COIN_ORDER) do
         local n = breakdown and breakdown[coinId]
         if n and n > 0 then
             local value = constants.COIN_VALUES[coinId] or 0
-            mon.setCursorPos(3, y)
-            mon.write(("%d x %s = %d units"):format(n, shortName(coinId), n * value))
+            mon.setCursorPos(2, y)
+            mon.write(("%d x %s = %d"):format(n, shortName(coinId), n * value):sub(1, lay.width - 2))
             y = y + 1
         end
     end
 
     mon.setTextColor(colors.lime)
-    mon.setCursorPos(3, y)
-    mon.write(("Current balance: %d"):format(acct.balance or 0))
+    mon.setCursorPos(2, y)
+    mon.write(("Balance: %d"):format(acct.balance or 0):sub(1, lay.width - 2))
     y = y + 1
-    mon.setCursorPos(3, y)
-    mon.write(("After withdraw:  %d"):format((acct.balance or 0) - amount))
+    mon.setCursorPos(2, y)
+    mon.write(("After: %d"):format((acct.balance or 0) - amount):sub(1, lay.width - 2))
     y = y + 1
 
     local btnW = 14

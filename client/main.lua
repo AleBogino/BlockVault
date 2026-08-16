@@ -17,6 +17,8 @@ local ME = require "shared.me"
 local FatalError = require "client.ui.screens.fatal_error"
 local activeMonitor = nil
 
+local CONNECT_RETRY_DELAY = 5
+
 --- Show the fatal error state on the ATM screen and the computer's terminal.
 --- @param err any the original error (optional)
 local function showFatalError(err)
@@ -42,6 +44,32 @@ local function detectMonitor()
         end
     end
     return nil
+end
+
+--- Revalidate monitor and settings
+--- @return table|nil wrapped monitor, or nil if none is currently available
+local function refreshMonitor()
+    local m = activeMonitor
+    if not m then
+        m = detectMonitor()
+        activeMonitor = m
+        if not m then
+            return nil
+        end
+    end
+
+    local ok = pcall(function() return m.getSize() end)
+    if not ok then
+        m = detectMonitor()
+        activeMonitor = m
+        if not m then
+            return nil
+        end
+    end
+
+    pcall(function() m.setTextScale(0.5) end)
+    pcall(function() m.setBackgroundColor(colors.black) end)
+    return m
 end
 
 --- Everything that can stop the client with an error
@@ -123,30 +151,31 @@ local function run()
     end
 
     local function main()
-        local connected, hsErr = connect()
-        if not connected then
-            print("Handshake failed: " .. tostring(hsErr))
-            print("Retry? (y/n)")
-            if read():lower() == "y" then
-                return main()
+        while true do
+            local connected, hsErr = connect()
+            if connected then
+                ui.run({
+                    clientProtocol = clientProtocol,
+                    network = network,
+                    myId = myId,
+                    sk = sk,
+                    pk = pk,
+                    serverId = serverInfo.serverId,
+                    serverPk = serverInfo.serverPk,
+                    connect = connect,
+                    monitor = monitor,
+                    refreshMonitor = refreshMonitor,
+                    inventoryMgr = inventoryMgr,
+                    meBridge = meBridge,
+                    meSide = constants.ME_BARREL_SIDE
+                })
+                return
             end
-            return
-        end
 
-        ui.run({
-            clientProtocol = clientProtocol,
-            network = network,
-            myId = myId,
-            sk = sk,
-            pk = pk,
-            serverId = serverInfo.serverId,
-            serverPk = serverInfo.serverPk,
-            connect = connect,
-            monitor = monitor,
-            inventoryMgr = inventoryMgr,
-            meBridge = meBridge,
-            meSide = constants.ME_BARREL_SIDE
-        })
+            print("Handshake failed: " .. tostring(hsErr))
+            print("Retrying in " .. CONNECT_RETRY_DELAY .. " seconds...")
+            sleep(CONNECT_RETRY_DELAY)
+        end
     end
     main()
 end

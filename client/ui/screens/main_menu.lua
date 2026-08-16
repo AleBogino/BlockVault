@@ -22,13 +22,23 @@ function MainMenu.draw(state, acct, message)
     mon.setBackgroundColor(colors.blue)
     mon.setTextColor(colors.white)
     mon.setCursorPos(1, 1)
-    local headerText = " User: " .. (acct.username or "?")
     local balanceText = "$" .. string.format("%.2f", acct.balance or 0)
-    local padding = lay.width - #headerText - #balanceText - 2
-    if padding < 1 then
-        padding = 1
+    local prefix = lay.width >= 20 and " User: " or ""
+    local trailing = " "
+    local maxUser = lay.width - #prefix - #balanceText - #trailing
+    if maxUser < 1 then
+        maxUser = 1
     end
-    mon.write(headerText .. string.rep(" ", padding) .. balanceText .. " ")
+    local username = acct.username or "?"
+    if #username > maxUser then
+        username = username:sub(1, maxUser)
+    end
+    local headerText = prefix .. username
+    local padding = lay.width - #headerText - #balanceText - #trailing
+    if padding < 0 then
+        padding = 0
+    end
+    mon.write(headerText .. string.rep(" ", padding) .. balanceText .. trailing)
     mon.setBackgroundColor(colors.black)
 
     -- Status message
@@ -42,36 +52,47 @@ function MainMenu.draw(state, acct, message)
     local btnW = 12
     local btnH = 3
     local row1 = 5
-    local row2 = 10
     local centerX = math.floor(lay.width / 2)
+    local centered = centerX - math.floor(btnW / 2)
 
-    -- Deposit button
-    local depX = centerX - math.floor(btnW / 2)
-    ScreenManager.register(Button.new(depX, row1, depX + btnW - 1, row1 + btnH - 1, "  Deposit   ", function()
+    local depositCb = function()
         Router.switch(state.screens.deposit, acct)
-    end, {
-        bg = colors.green,
-        fg = colors.white
-    })):draw(mon)
-
-    -- Transfer button
-    local trX = depX + btnW + 2
-    ScreenManager.register(Button.new(trX, row1, trX + btnW - 1, row1 + btnH - 1, " Transfer   ", function()
+    end
+    local transferCb = function()
         Router.switch(state.screens.transfer, acct)
-    end, {
-        bg = colors.orange,
-        fg = colors.white
-    })):draw(mon)
+    end
+    local withdrawCb = function()
+        Router.switch(state.screens.withdraw, acct)
+    end
 
-    -- Withdraw button
-    local witX = centerX - math.floor(btnW / 2)
-    ScreenManager.register(Button.new(witX, row1 + btnH + 1, witX + btnW - 1, row1 + btnH + btnH, " Withdraw   ",
-        function()
-            Router.switch(state.screens.withdraw, acct)
-        end, {
-            bg = colors.red,
-            fg = colors.white
+    if lay.width >= (btnW * 2) + 6 then
+        -- Wide: Deposit + Transfer side by side, Withdraw below
+        ScreenManager.register(Button.new(centered, row1, centered + btnW - 1, row1 + btnH - 1, "  Deposit   ", depositCb, {
+            bg = colors.green, fg = colors.white
         })):draw(mon)
+
+        ScreenManager.register(Button.new(centered + btnW + 2, row1, centered + btnW + 2 + btnW - 1, row1 + btnH - 1, " Transfer   ", transferCb, {
+            bg = colors.orange, fg = colors.white
+        })):draw(mon)
+
+        ScreenManager.register(Button.new(centered, row1 + btnH + 1, centered + btnW - 1, row1 + btnH + btnH, " Withdraw   ", withdrawCb, {
+            bg = colors.red, fg = colors.white
+        })):draw(mon)
+    else
+        -- Narrow: stack the three vertically
+        local gap = 1
+        ScreenManager.register(Button.new(centered, row1, centered + btnW - 1, row1 + btnH - 1, "  Deposit   ", depositCb, {
+            bg = colors.green, fg = colors.white
+        })):draw(mon)
+
+        ScreenManager.register(Button.new(centered, row1 + btnH + gap, centered + btnW - 1, row1 + btnH + gap + btnH - 1, " Transfer   ", transferCb, {
+            bg = colors.orange, fg = colors.white
+        })):draw(mon)
+
+        ScreenManager.register(Button.new(centered, row1 + 2 * (btnH + gap), centered + btnW - 1, row1 + 2 * (btnH + gap) + btnH - 1, " Withdraw   ", withdrawCb, {
+            bg = colors.red, fg = colors.white
+        })):draw(mon)
+    end
 
     -- Is admin?
     local isAdmin = (acct.permission == constants.PERMISSION.ADMIN or acct.permission == constants.PERMISSION.SYSTEM)
