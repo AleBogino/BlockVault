@@ -4,6 +4,7 @@ local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
 local ME = require "shared.me"
+local TextWrap = require "client.ui.textwrap"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -29,13 +30,12 @@ local function drawInsert(state, acct, message)
     mon.write("Deposit")
 
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, lay.headerRow + 1)
-    mon.write("Insert your coins into the barrel now.")
+    local y = lay.headerRow + 1
+    y = TextWrap.write(mon, "Insert your coins into the barrel now.", 3, y)
 
     if message then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, lay.headerRow + 3)
-        mon.write(message:sub(1, lay.width - 2))
+        TextWrap.write(mon, message, 2, y + 1)
     end
 
     local btnW = 14
@@ -79,16 +79,14 @@ local function drawConfirm(state, acct, breakdown, total)
 
     mon.setTextColor(colors.cyan)
     mon.setCursorPos(3, lay.headerRow)
-    mon.write("Deposit - Review")
+    mon.write("Deposit Review")
 
     local y = lay.headerRow + 1
     mon.setTextColor(colors.white)
 
     if total <= 0 then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(3, y)
-        mon.write("No recognized coins found in the barrel.")
-        y = y + 1
+        y = TextWrap.write(mon, "No recognized coins found in the barrel.", 3, y)
     else
         mon.setCursorPos(3, y)
         mon.write("Coins found:")
@@ -99,32 +97,22 @@ local function drawConfirm(state, acct, breakdown, total)
             if n and n > 0 then
                 local value = constants.COIN_VALUES[coinId] or 0
                 local line = ("%d x %s = %d units"):format(n, shortName(coinId), n * value)
-                mon.setCursorPos(3, y)
-                mon.write(line:sub(1, lay.width - 3))
-                y = y + 1
+                y = TextWrap.write(mon, line, 3, y)
             end
         end
 
         mon.setTextColor(colors.lime)
-        mon.setCursorPos(2, y)
-        mon.write(("Total: %d"):format(total):sub(1, lay.width - 2))
-        y = y + 1
+        y = TextWrap.write(mon, ("Total: %d"):format(total), 2, y)
     end
 
     mon.setTextColor(colors.white)
-    mon.setCursorPos(2, y)
-    mon.write(("Balance: %d"):format(acct.balance or 0):sub(1, lay.width - 2))
-    y = y + 1
-    mon.setCursorPos(2, y)
-    mon.write(("After: %d"):format((acct.balance or 0) + total):sub(1, lay.width - 2))
-    y = y + 1
+    y = TextWrap.write(mon, ("Balance: %d"):format(acct.balance or 0), 2, y)
+    y = TextWrap.write(mon, ("After: %d"):format((acct.balance or 0) + total), 2, y)
 
     local available = state.inventoryMgr ~= nil and state.meBridge ~= nil
     if not available then
         mon.setTextColor(colors.red)
-        mon.setCursorPos(3, y)
-        mon.write("Physical deposits unavailable on this terminal.")
-        y = y + 1
+        TextWrap.write(mon, "Physical deposits unavailable on this terminal.", 3, y)
     end
 
     local btnW = 14

@@ -5,6 +5,7 @@ local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local Keypad = require "client.ui.keypad"
 local constants = require "shared.constants"
+local TextWrap = require "client.ui.textwrap"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -30,14 +31,13 @@ local function drawAmountStage(state, acct, recipient, message)
     mon.write("Transfer")
 
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, lay.headerRow + 1)
-    mon.write("To: " .. recipient)
+    local y = lay.headerRow + 1
+    y = TextWrap.write(mon, "To: " .. recipient, 3, y)
 
     -- message
     if message then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, lay.headerRow + 2)
-        mon.write(message:sub(1, lay.width - 2))
+        TextWrap.write(mon, message, 2, y + 1)
     end
 
     state.inputBuffer = ""
@@ -108,17 +108,16 @@ local function drawRecipientStage(state, acct, players, page, message)
     -- header
     mon.setTextColor(colors.cyan)
     mon.setCursorPos(3, lay.headerRow)
-    mon.write("Transfer - Select Recipient")
+    mon.write("Pick Recipient")
 
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, lay.headerRow + 1)
-    mon.write("From: " .. acct.username)
+    local y = lay.headerRow + 1
+    y = TextWrap.write(mon, "From: " .. acct.username, 3, y)
 
     -- message
     if message then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, lay.headerRow + 2)
-        mon.write(message:sub(1, lay.width - 2))
+        TextWrap.write(mon, message, 2, y + 1)
     end
 
     -- Player list
@@ -130,8 +129,7 @@ local function drawRecipientStage(state, acct, players, page, message)
 
     if #players == 0 then
         mon.setTextColor(colors.red)
-        mon.setCursorPos(4, listY)
-        mon.write("No other players online.")
+        TextWrap.write(mon, "No other players online.", 4, listY)
     else
         local row = listY
         for i = startPage, endPage do

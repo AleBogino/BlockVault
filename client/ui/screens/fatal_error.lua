@@ -1,6 +1,8 @@
 -- Fatal error screen
 -- Static state
 
+local TextWrap = require "client.ui.textwrap"
+
 local FatalError = {}
 
 --- Draw the fatal error state.
@@ -34,8 +36,11 @@ function FatalError.draw(state)
         local subtitle = "Contact maintenance"
         mon.setBackgroundColor(colors.black)
         mon.setTextColor(colors.white)
-        mon.setCursorPos(math.max(1, math.floor((w - #subtitle) / 2) + 1), math.min(h, mid + 1))
-        mon.write(subtitle)
+        local subtitleLines = TextWrap.wrap(subtitle, 15)
+        for i, line in ipairs(subtitleLines) do
+            mon.setCursorPos(math.max(1, math.floor((w - #line) / 2) + 1), math.min(h, mid + i))
+            mon.write(line)
+        end
     end)
 
     return ok

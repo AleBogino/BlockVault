@@ -26,7 +26,7 @@ function Net.sendAndReceive(state, packetType, payloadTable, timeout)
 
     local reply = state.network.receiveOnce(timeout or REQUEST_TIMEOUT)
     if not reply then
-        return nil, "Request timed out. Server may be offline or unreachable."
+        return nil, "Timed out. Is server online?"
     end
 
     local payload, decErr = session:receive(reply)

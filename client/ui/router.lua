@@ -91,7 +91,7 @@ function Router.run(state, firstScreen)
                 state.network.send(state.serverId, pkt)
             end
             local Rest = require "client.ui.screens.rest"
-            Router.switch(Rest, "Session timed out due to inactivity.")
+            Router.switch(Rest, "Session timed out.")
         elseif event == "timer" and p1 == redrawTimer then
             Router.redraw()
             redrawTimer = os.startTimer(REDRAW_INTERVAL)

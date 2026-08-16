@@ -9,6 +9,7 @@ local Layout = require "client.ui.layout"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
 local packet = require "shared.packet"
+local TextWrap = require "client.ui.textwrap"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -47,15 +48,12 @@ function Rest.draw(state, message)
         tagline = "Coin banking"
     end
     mon.setTextColor(colors.lightGray)
-    mon.setCursorPos(centerCol(tagline), 6)
-    mon.write(tagline)
+    TextWrap.writeCentered(mon, tagline, 6)
 
     -- Status message
     if message then
-        message = tostring(message):sub(1, lay.width)
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(centerCol(message), 9)
-        mon.write(message)
+        TextWrap.writeCentered(mon, message, 9)
     end
 
     -- Start button
@@ -109,9 +107,7 @@ local function drawLoginWait(state, loginCode, flags)
     mon.setBackgroundColor(colors.black)
 
     mon.setTextColor(colors.lightGray)
-    local hint = "Waiting for chat"
-    mon.setCursorPos(centerCol(hint), 10)
-    mon.write(hint)
+    TextWrap.writeCentered(mon, "Waiting for chat", 10)
 
     local btnW = 9
     local btnX = math.floor((lay.width - btnW) / 2) + 1
@@ -195,13 +191,13 @@ function Rest.startLogin(state)
                     Rest.draw(state, "Login failed: " .. reason)
                     return
                 elseif result == "LOGIN_TIMEOUT" then
-                    Rest.draw(state, "Login timed out. Please try again.")
+                    Rest.draw(state, "Timed out. Try again.")
                     return
                 end
             end
 
         elseif event == "timer" and p1 == loginTimer then
-            Rest.draw(state, "Login timed out. Please try again.")
+            Rest.draw(state, "Timed out. Try again.")
             return
 
         elseif event == "timer" and p1 == redrawTimer then
@@ -234,9 +230,7 @@ function Rest.drawCreateAccountPrompt(state, username)
     mon.clear()
 
     mon.setTextColor(colors.yellow)
-    local msg = ("No account for " .. username):sub(1, lay.width)
-    mon.setCursorPos(centerCol(msg), 4)
-    mon.write(msg)
+    TextWrap.writeCentered(mon, "No account for " .. username, 4)
 
     local msg2 = "Create one?"
     mon.setCursorPos(centerCol(msg2), 6)

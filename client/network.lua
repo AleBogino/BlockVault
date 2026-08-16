@@ -66,7 +66,7 @@ function M.handshake(clientProtocol, timeout)
     while true do
         local pkt = M.receiveOnce(timeout or 10)
         if not pkt then
-            return false, "timed out waiting for a handshake response"
+            return false, "handshake timed out"
         end
         local reply, result = clientProtocol:handlePacket(pkt)
         if reply then

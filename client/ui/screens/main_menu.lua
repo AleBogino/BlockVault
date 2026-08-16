@@ -4,6 +4,7 @@ local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
+local TextWrap = require "client.ui.textwrap"
 
 local MainMenu = {}
 
@@ -44,8 +45,7 @@ function MainMenu.draw(state, acct, message)
     -- Status message
     if message then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, 2)
-        mon.write(message:sub(1, lay.width - 2))
+        TextWrap.write(mon, message, 2, 2)
     end
 
     -- Buttons

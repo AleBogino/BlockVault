@@ -6,6 +6,7 @@ local Net = require "client.ui.net"
 local Keypad = require "client.ui.keypad"
 local constants = require "shared.constants"
 local ME = require "shared.me"
+local TextWrap = require "client.ui.textwrap"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -25,34 +26,25 @@ local function drawReview(state, acct, amount, breakdown)
 
     mon.setTextColor(colors.cyan)
     mon.setCursorPos(3, lay.headerRow)
-    mon.write("Withdraw - Review")
+    mon.write("Withdraw Review")
 
     local y = lay.headerRow + 1
     mon.setTextColor(colors.white)
-    mon.setCursorPos(2, y)
-    mon.write(("Amt: %d"):format(amount):sub(1, lay.width - 2))
-    y = y + 1
-    mon.setCursorPos(2, y)
-    mon.write(("Coins:"):sub(1, lay.width - 2))
-    y = y + 1
+    y = TextWrap.write(mon, ("Amt: %d"):format(amount), 2, y)
+    y = TextWrap.write(mon, "Coins:", 2, y)
 
     for _, coinId in ipairs(constants.COIN_ORDER) do
         local n = breakdown and breakdown[coinId]
         if n and n > 0 then
             local value = constants.COIN_VALUES[coinId] or 0
-            mon.setCursorPos(2, y)
-            mon.write(("%d x %s = %d"):format(n, shortName(coinId), n * value):sub(1, lay.width - 2))
-            y = y + 1
+            mon.setTextColor(colors.white)
+            y = TextWrap.write(mon, ("%d x %s = %d"):format(n, shortName(coinId), n * value), 2, y)
         end
     end
 
     mon.setTextColor(colors.lime)
-    mon.setCursorPos(2, y)
-    mon.write(("Balance: %d"):format(acct.balance or 0):sub(1, lay.width - 2))
-    y = y + 1
-    mon.setCursorPos(2, y)
-    mon.write(("After: %d"):format((acct.balance or 0) - amount):sub(1, lay.width - 2))
-    y = y + 1
+    y = TextWrap.write(mon, ("Balance: %d"):format(acct.balance or 0), 2, y)
+    y = TextWrap.write(mon, ("After: %d"):format((acct.balance or 0) - amount), 2, y)
 
     local btnW = 14
     local bx = math.floor((lay.width - btnW) / 2) + 1
@@ -140,14 +132,13 @@ function Withdraw.draw(state, acct, target, message)
 
     local targetUser = target or acct.username
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, lay.headerRow + 1)
-    mon.write("From: " .. targetUser)
+    local y = lay.headerRow + 1
+    y = TextWrap.write(mon, "From: " .. targetUser, 3, y)
 
     -- message
     if message then
         mon.setTextColor(colors.yellow)
-        mon.setCursorPos(2, lay.headerRow + 2)
-        mon.write(message:sub(1, lay.width - 2))
+        TextWrap.write(mon, message, 2, y + 1)
     end
 
     state.inputBuffer = ""
