@@ -123,12 +123,8 @@ function ME.craftItem(me, coinId, count, cpuName)
     if not me then return false, constants.ERROR.NO_ME_BRIDGE end
     if not ME.isConnected(me) then return false, constants.ERROR.ME_NOT_CONNECTED end
     local filter = { name = coinId, count = count }
-    local ok, res, err = pcall(function()
-        if cpuName then
-            return me.craftItem(filter, cpuName)
-        end
-        return me.craftItem(filter)
-    end)
+
+    local ok, res, err = pcall(function() return me.craftItem(filter) end)
     if not ok then
         return false, tostring(res)
     end
@@ -156,13 +152,10 @@ function ME.getCraftingCPUs(me)
 end
 
 --- Name of the first non-busy crafting CPU, or nil (let AE2 pick).
+--- NOTE: the AP ME Bridge rejects the names returned by getCraftingCPUs()
+--- (e.g. "CPU Unnamed does not exists"), so we always return nil and let AE2
+--- auto-select a CPU.
 function ME.pickCraftingCpu(me)
-    for _, cpu in pairs(ME.getCraftingCPUs(me)) do
-        if type(cpu) == "table" and cpu.isBusy ~= true then
-            if type(cpu.name) == "string" then return cpu.name end
-            return nil
-        end
-    end
     return nil
 end
 
