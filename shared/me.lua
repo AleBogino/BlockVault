@@ -151,13 +151,6 @@ function ME.getCraftingCPUs(me)
     return {}
 end
 
---- Name of the first non-busy crafting CPU, or nil (let AE2 pick).
---- NOTE: the AP ME Bridge rejects the names returned by getCraftingCPUs()
---- (e.g. "CPU Unnamed does not exists"), so we always return nil and let AE2
---- auto-select a CPU.
-function ME.pickCraftingCpu(me)
-    return nil
-end
 
 -- calculate minimum number of coins for target value
 -- largest denomination first

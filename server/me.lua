@@ -289,7 +289,6 @@ function ServerME.coinBreakdown(target)
     end
 
     local deadline = os.epoch("utc") + constants.CRAFT_TIMEOUT_MS
-    local cpu = ME.pickCraftingCpu(bridge)
 
     for attemptNo = 1, 3 do
         local plan = ME.planChange(target, netListCoins())
@@ -313,7 +312,7 @@ function ServerME.coinBreakdown(target)
                         print(("[SRV][ME] coinBreakdown: %s not craftable"):format(coinId))
                         return nil, constants.ERROR.ME_CRAFT_UNAVAILABLE
                     end
-                    local ok, err = ME.craftItem(bridge, coinId, want, cpu)
+                    local ok, err = ME.craftItem(bridge, coinId, want, nil)
                     if not ok then
                         print(("[SRV][ME] coinBreakdown: craft %s x%d failed: %s"):format(coinId, want, tostring(err)))
                         return nil, constants.ERROR.ME_CRAFT_FAILED
@@ -388,13 +387,12 @@ function ServerME.maintainStock()
         return
     end
 
-    local cpu = ME.pickCraftingCpu(bridge)
     local coinId = denoms[bestIdx]
 
     -- 1) Split down from the nearest surplus above (one 1->9 recipe).
     for j = bestIdx + 1, #denoms do
         if (available[denoms[j]] or 0) > target then
-            local ok, err = ME.craftItem(bridge, coinId, 9, cpu)
+            local ok, err = ME.craftItem(bridge, coinId, 9, nil)
             if ok then
                 print(("[SRV][ME] maintainStock: split %s -> 9x %s"):format(denoms[j], coinId))
             else
@@ -406,7 +404,7 @@ function ServerME.maintainStock()
 
     -- 2) Combine up from the next smaller denomination (9 -> 1).
     if bestIdx > 1 and (available[denoms[bestIdx - 1]] or 0) >= target + 9 then
-        local ok, err = ME.craftItem(bridge, coinId, 1, cpu)
+        local ok, err = ME.craftItem(bridge, coinId, 1, nil)
         if ok then
             print(("[SRV][ME] maintainStock: combined 9x %s -> 1x %s"):format(denoms[bestIdx - 1], coinId))
         else
