@@ -54,6 +54,9 @@ local function classify(cat, name, viaModem)
     if hasType(name, "monitor", viaModem) then
         table.insert(cat.monitors, name)
     end
+    if hasType(name, "drive", viaModem) then
+        table.insert(cat.drives, name)
+    end
     if hasType(name, "meBridge", viaModem) then
         table.insert(cat.meBridges, name)
     end
@@ -72,7 +75,7 @@ local function classify(cat, name, viaModem)
 end
 
 --- Scan attached peripherals
---- @return table { all=map, inventories=string[], meBridges=string[], modems=string[], wireless=string[], wired=string[], monitors=string[] }
+--- @return table { all=map, inventories=string[], meBridges=string[], modems=string[], wireless=string[], wired=string[], monitors=string[], drives=string[] }
 function Peripheral.scan()
     local cat = {
         all         = {},
@@ -82,6 +85,7 @@ function Peripheral.scan()
         wireless    = {},
         wired       = {},
         monitors    = {},
+        drives      = {},
         chatBoxes   = {},
         seen        = {},
     }
@@ -130,6 +134,16 @@ end
 function Peripheral.pickChatBox(cat)
     if cat and cat.chatBoxes and #cat.chatBoxes > 0 then
         return cat.chatBoxes[1]
+    end
+    return nil
+end
+
+--- Pick the first disk drive name
+--- @param cat table result from Peripheral.scan()
+--- @return string|nil disk drive name
+function Peripheral.pickDrive(cat)
+    if cat and cat.drives and #cat.drives > 0 then
+        return cat.drives[1]
     end
     return nil
 end
