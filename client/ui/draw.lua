@@ -105,9 +105,10 @@ end
 --- @param lay table layout
 --- @param title string
 --- @param color? number (default colors.cyan)
-function Draw.header(mon, lay, title, color)
+--- @param x? number column (default 3)
+function Draw.header(mon, lay, title, color, x)
     mon.setTextColor(color or colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
+    mon.setCursorPos(x or 3, lay.headerRow)
     mon.write(title)
 end
 

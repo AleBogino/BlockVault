@@ -61,12 +61,14 @@ function Keypad.draw(mon, layout, state, opts)
     local confirmW = 6
     local cancelW  = 7
     local gap      = 2
+    local rowW = confirmW + gap + cancelW
+    local rx = math.max(1, math.floor((layout.width - rowW) / 2) + 1)
 
     -- Confirm button
     if opts.onConfirm then
         ScreenManager.register(Button.new(
-            ox, layout.confirmButtonRow,
-            ox + confirmW - 1, layout.confirmButtonRow,
+            rx, layout.confirmButtonRow,
+            rx + confirmW - 1, layout.confirmButtonRow,
             "Confirm",
             opts.onConfirm,
             { bg = colors.green, fg = colors.white }
@@ -76,8 +78,8 @@ function Keypad.draw(mon, layout, state, opts)
     -- Cancel button
     if opts.onCancel then
         ScreenManager.register(Button.new(
-            ox - 3 + confirmW + gap, layout.confirmButtonRow,
-            ox - 3 + confirmW + gap + cancelW - 1, layout.confirmButtonRow,
+            rx + confirmW + gap, layout.confirmButtonRow,
+            rx + confirmW + gap + cancelW - 1, layout.confirmButtonRow,
             "Cancel",
             opts.onCancel,
             { bg = colors.red, fg = colors.white }

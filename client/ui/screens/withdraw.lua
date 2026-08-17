@@ -106,16 +106,16 @@ function Withdraw.draw(state, acct, target, message)
     Draw.clear(mon)
 
     -- header
-    Draw.header(mon, lay, "Withdraw")
+    Draw.header(mon, lay, "Withdraw", colors.cyan, 2)
 
     local targetUser = target or acct.username
     mon.setTextColor(colors.white)
     local y = lay.headerRow + 1
-    y = TextWrap.write(mon, "From: " .. targetUser, 3, y)
+    y = TextWrap.write(mon, "From: " .. targetUser, 2, y)
 
     -- message
     if message then
-        Draw.banner(mon, message, 2, y + 1)
+        Draw.banner(mon, message, 1, y + 1)
     end
 
     state.inputBuffer = ""
