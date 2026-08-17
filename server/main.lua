@@ -10,6 +10,7 @@ local ccutil = require "ccryptolib.util"
 local ServerProtocol = require "server.protocol"
 local network = require "server.network"
 local ServerME = require "server.me"
+local Toast = require "server.toast"
 
 crypto.initRandom()
 
@@ -26,6 +27,7 @@ if not ok then
     error("network.open() failed: " .. tostring(err))
 end
 print("Modem open. Listening for connections...")
+Toast.init(network.chatBox)
 if network.chatBox then
     print("Chat box detected. Chat login active. Players use: $bank login <code>")
 else

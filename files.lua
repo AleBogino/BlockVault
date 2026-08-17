@@ -69,6 +69,9 @@ files.server = {
         path = "server/protocol.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/protocol.lua"
     }, {
+        path = "server/toast.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/toast.lua"
+    }, {
         path = "server/transactions.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/transactions.lua"
     }

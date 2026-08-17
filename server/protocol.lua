@@ -16,6 +16,7 @@ local Auth = require "server.auth"
 local Accounts = require "server.accounts"
 local Transactions = require "server.transactions"
 local Logger = require "server.logger"
+local Toast = require "server.toast"
 
 -- Generate a random numeric login code
 local function generateLoginCode()
@@ -246,6 +247,7 @@ function ServerProtocol:onChatLogin(username, code)
     if not entry then
         -- code not found or expired
         print("[SRV] Login code " .. tostring(code) .. " not found in pending logins")
+        Toast.error(username, "Invalid or expired login code.")
         return
     end
 
@@ -255,6 +257,7 @@ function ServerProtocol:onChatLogin(username, code)
     local session = self.sessions[senderId]
     if not session then
         print("[SRV] No active session for client " .. tostring(senderId))
+        Toast.error(username, "Login session expired. Please start login again.")
         return
     end
 
@@ -274,6 +277,7 @@ function ServerProtocol:onChatLogin(username, code)
         -- Send via rednet
         rednet.send(senderId, reply, "ccbank")
         print("[SRV] LOGIN_OK sent to " .. tostring(senderId) .. " for user " .. username)
+        Toast.success(username, "Welcome back, " .. username .. "!")
     else
         -- No account yet: tell user they're a dumb one
         local reply = session:send(constants.PACKET.LOGIN_OK, self.myId, self.mySk, self.myPk, {
@@ -286,6 +290,7 @@ function ServerProtocol:onChatLogin(username, code)
         })
         rednet.send(senderId, reply, "ccbank")
         print("[SRV] LOGIN_OK (new) sent to " .. tostring(senderId) .. " for user " .. username)
+        Toast.success(username, "Account ready. Welcome, " .. username .. "!")
     end
 end
 

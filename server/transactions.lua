@@ -7,6 +7,7 @@ local constants = require "shared.constants"
 local utils = require "shared.utils"
 local Auth = require "server.auth"
 local ServerME = require "server.me"
+local Toast = require "server.toast"
 
 local Transactions = {}
 
@@ -372,6 +373,10 @@ function Transactions.transfer(payload, authResult)
     if not ok then
         return false, constants.ERROR.SERVER_ERROR
     end
+
+    -- Toast notifications
+    Toast.notify(payload.to, ("You received %d from %s"):format(payload.amount, payload.from))
+    Toast.success(payload.from, ("Transfer of %d to %s successful"):format(payload.amount, payload.to))
 
     return true, {
         fromBalance = fromAcct.balance,
