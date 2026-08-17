@@ -11,6 +11,13 @@ local M = {}
 M.box = nil
 M.warned = false
 
+-- Chat Box cooldown (default 1 second)
+local COOLDOWN_MS = 1000
+
+M.queue = {}
+M.lastSentAt = 0
+M.timer = nil
+
 local DEFAULTS = {
     prefix   = "Bank",
     brackets = "[]",
@@ -70,25 +77,28 @@ function M.ready()
     return true
 end
 
---- Send a plain toast notification.
---- @param player  string  player name or uuid (required)
---- @param title   string  toast title (required)
---- @param message string  toast message (required)
---- @param options table|nil { prefix=, brackets=, bracketColor=, utf8= }
---- @return boolean ok
---- @return string|nil err
-function M.send(player, title, message, options)
-    local ok, err = M.ready()
-    if not ok then
-        return nil, err
+--- Cancel any pending queue timer.
+local function clearTimer()
+    if M.timer then
+        os.cancelTimer(M.timer)
+        M.timer = nil
     end
-    if type(player) ~= "string" or player == "" then
-        return nil, "player name required"
+end
+
+--- Schedule the queue to be pumped when the cooldown expires
+local function armTimer(seconds)
+    clearTimer()
+    if seconds <= 0 then seconds = 0.05 end
+    M.timer = os.startTimer(seconds)
+end
+
+--- peripheral call for a plain toast
+local function dispatch(player, title, message, options)
+    if not M.box then
+        return nil, "no chat_box peripheral attached"
     end
 
-    options = options or {}
-    title = title or DEFAULTS.prefix
-    message = message or ""
+    M.lastSentAt = os.epoch("utc")
 
     local called, result, callErr
     if M.box.sendToast then
@@ -128,25 +138,13 @@ function M.send(player, title, message, options)
     return nil, errMsg
 end
 
---- Send a toast with title and message
---- @param player  string
---- @param title   string|table  JSON string or component table
---- @param message string|table  JSON string or component table
---- @param options table|nil { prefix=, brackets=, bracketColor=, utf8= }
---- @return boolean ok
---- @return string|nil err
-function M.sendFormatted(player, title, message, options)
-    local ok, err = M.ready()
-    if not ok then
-        return nil, err
-    end
-    if type(player) ~= "string" or player == "" then
-        return nil, "player name required"
+--- peripheral call for a formatted toast.
+local function dispatchFormatted(player, titleJson, messageJson, options)
+    if not M.box then
+        return nil, "no chat_box peripheral attached"
     end
 
-    options = options or {}
-    local titleJson = toJson(title)
-    local messageJson = toJson(message)
+    M.lastSentAt = os.epoch("utc")
 
     local called, result, callErr
     if M.box.sendFormattedToast then
@@ -186,6 +184,79 @@ function M.sendFormatted(player, title, message, options)
     return nil, errMsg
 end
 
+--- Send a plain toast notification.
+--- @param player  string  player name or uuid (required)
+--- @param title   string  toast title (required)
+--- @param message string  toast message (required)
+--- @param options table|nil { prefix=, brackets=, bracketColor=, utf8= }
+--- @return boolean ok
+--- @return string|nil err
+function M.send(player, title, message, options)
+    local ok, err = M.ready()
+    if not ok then
+        return nil, err
+    end
+    if type(player) ~= "string" or player == "" then
+        return nil, "player name required"
+    end
+
+    options = options or {}
+    title = title or DEFAULTS.prefix
+    message = message or ""
+
+    -- Respect the chat box cooldown
+    local now = os.epoch("utc")
+    if now - M.lastSentAt < COOLDOWN_MS then
+        M.queue[#M.queue + 1] = {
+            player = player,
+            title = title,
+            message = message,
+            options = options,
+            formatted = false,
+        }
+        armTimer((M.lastSentAt + COOLDOWN_MS - now) / 1000)
+        return true
+    end
+
+    return dispatch(player, title, message, options)
+end
+
+--- Send a toast with title and message
+--- @param player  string
+--- @param title   string|table  JSON string or component table
+--- @param message string|table  JSON string or component table
+--- @param options table|nil { prefix=, brackets=, bracketColor=, utf8= }
+--- @return boolean ok
+--- @return string|nil err
+function M.sendFormatted(player, title, message, options)
+    local ok, err = M.ready()
+    if not ok then
+        return nil, err
+    end
+    if type(player) ~= "string" or player == "" then
+        return nil, "player name required"
+    end
+
+    options = options or {}
+    local titleJson = toJson(title)
+    local messageJson = toJson(message)
+
+    local now = os.epoch("utc")
+    if now - M.lastSentAt < COOLDOWN_MS then
+        M.queue[#M.queue + 1] = {
+            player = player,
+            titleJson = titleJson,
+            messageJson = messageJson,
+            options = options,
+            formatted = true,
+        }
+        armTimer((M.lastSentAt + COOLDOWN_MS - now) / 1000)
+        return true
+    end
+
+    return dispatchFormatted(player, titleJson, messageJson, options)
+end
+
 -- ---------------------------- convenience wrappers ---------------------------- --
 
 --- Quick toast with the default "Bank" title.
@@ -207,6 +278,34 @@ end
 
 function M.error(player, message, options)
     return M.send(player, "Error", message, options)
+end
+
+--- Process the queued toasts
+function M.pump()
+    if #M.queue == 0 then
+        clearTimer()
+        return
+    end
+
+    local now = os.epoch("utc")
+    if now - M.lastSentAt < COOLDOWN_MS then
+        armTimer((M.lastSentAt + COOLDOWN_MS - now) / 1000)
+        return
+    end
+
+    local item = table.remove(M.queue, 1)
+    if item.formatted then
+        dispatchFormatted(item.player, item.titleJson, item.messageJson, item.options)
+    else
+        dispatch(item.player, item.title, item.message, item.options)
+    end
+
+    if #M.queue > 0 then
+        local remaining = M.lastSentAt + COOLDOWN_MS - os.epoch("utc")
+        armTimer(math.max(0, remaining) / 1000)
+    else
+        clearTimer()
+    end
 end
 
 return M
