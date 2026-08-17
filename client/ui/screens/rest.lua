@@ -77,7 +77,7 @@ local function drawLoginWait(state, loginCode, flags)
     mon.write(instruction)
 
     -- Split the command so the 4-char code is never clipped on narrow screens
-    local cmdPrefix = "$$ login"
+    local cmdPrefix = "$$login"
     mon.setTextColor(colors.green)
     mon.setCursorPos(Draw.centerCol(lay, cmdPrefix), 7)
     mon.write(cmdPrefix)
