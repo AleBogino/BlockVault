@@ -100,6 +100,9 @@ files.client = {
         path = "client/ui/button.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/button.lua"
     }, {
+        path = "client/ui/draw.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/draw.lua"
+    }, {
         path = "client/ui/keypad.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/client/ui/keypad.lua"
     }, {
