@@ -211,6 +211,12 @@ local function dispatchChat(player, message, options)
 
     M.lastSentAt = os.epoch("utc")
 
+    -- bake chat prefix
+    local prefix = options.prefix or DEFAULTS.prefix
+    if prefix and prefix ~= "" then
+        message = "[" .. prefix .. "] " .. message
+    end
+
     local called, result, callErr
     if player and player ~= "" then
         if M.box.sendMessageToPlayer then
@@ -250,6 +256,18 @@ local function dispatchChatFormatted(player, messageJson, options)
     end
 
     M.lastSentAt = os.epoch("utc")
+
+    local prefix = options.prefix or DEFAULTS.prefix
+    if prefix and prefix ~= "" and textutils then
+        local ok, parsed = pcall(textutils.unserialiseJSON, messageJson)
+        if ok and parsed ~= nil then
+            local wrapped = { { text = "[" .. prefix .. "] " }, parsed }
+            local okJson, json = pcall(textutils.serialiseJSON, wrapped)
+            if okJson then
+                messageJson = json
+            end
+        end
+    end
 
     local called, result, callErr
     if player and player ~= "" then
