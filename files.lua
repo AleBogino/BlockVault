@@ -48,8 +48,8 @@ files.server = {
         path = "server/auth.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/auth.lua"
     }, {
-        path = "server/chat_handler.lua",
-        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/chat_handler.lua"
+        path = "server/chat.lua",
+        url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/chat.lua"
     }, {
         path = "server/database.lua",
         url = "https://raw.githubusercontent.com/alebogino/BlockVault/master/server/database.lua"

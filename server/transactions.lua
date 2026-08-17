@@ -355,6 +355,14 @@ function Transactions.transfer(payload, authResult)
         return false, constants.ERROR.DESTINATION_NO_ACCOUNT
     end
 
+    -- Frozen accounts can't send or receive money
+    if fromAcct.paused then
+        return false, constants.ERROR.ACCOUNT_PAUSED
+    end
+    if toAcct.paused then
+        return false, constants.ERROR.ACCOUNT_PAUSED
+    end
+
     if fromAcct.balance < payload.amount then
         return false, constants.ERROR.INSUFFICIENT_FUNDS
     end

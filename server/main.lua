@@ -11,6 +11,7 @@ local ServerProtocol = require "server.protocol"
 local network = require "server.network"
 local ServerME = require "server.me"
 local Toast = require "server.toast"
+local Chat = require "server.chat"
 local Peripheral = require "shared.peripheral"
 
 crypto.initRandom()
@@ -97,5 +98,6 @@ local server = ServerProtocol.new({
 })
 
 ServerME.init()
+Chat.init(server)
 
 network.serveForever(server)

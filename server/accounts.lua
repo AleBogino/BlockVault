@@ -16,7 +16,8 @@ local function sanitiseAccount(acct)
         id = acct.id,
         balance = acct.balance,
         permission = acct.permission,
-        createdAt = acct.createdAt
+        createdAt = acct.createdAt,
+        paused = acct.paused == true
     }
 end
 
@@ -49,6 +50,43 @@ function Accounts.createAccount(payload, authResult, session)
         username = payload.username,
         balance = payload.initialBalance,
         permission = constants.PERMISSION.USER
+    }
+
+    local ok, err = db.saveAccount(record)
+    if not ok then
+        return false, constants.ERROR.SERVER_ERROR
+    end
+    return true, sanitiseAccount(db.getAccount(payload.username))
+end
+
+--- Admin-only: create an account for a player
+--- @param payload table {username, initialBalance}
+--- @param authResult table AuthResult from a chat admin (ADMIN permission)
+function Accounts.adminCreateAccount(payload, authResult)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.ADMIN)
+    if not resolved then
+        return false, rerr
+    end
+
+    if not utils.isNonEmptyString(payload.username) then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+    if payload.initialBalance == nil then
+        payload.initialBalance = 0
+    end
+    if not utils.isNonNegativeNumber(payload.initialBalance) then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+
+    local existing = db.getAccount(payload.username)
+    if existing then
+        return false, "USERNAME_TAKEN"
+    end
+
+    local record = {
+        username = payload.username,
+        balance = payload.initialBalance,
+        permission = constants.PERMISSION.USER,
     }
 
     local ok, err = db.saveAccount(record)
@@ -135,6 +173,67 @@ function Accounts.updateAccount(payload, authResult)
         end
         acct.permission = payload.permission
     end
+
+    local ok, err = db.saveAccount(acct)
+    if not ok then
+        return false, constants.ERROR.SERVER_ERROR
+    end
+    return true, sanitiseAccount(db.getAccount(acct.username))
+end
+
+-- ---------------------------------- PAUSE ---------------------------------- --
+
+--- Pause an account (freezes all financial activity).
+--- @param payload table {username}
+--- @param authResult table AuthResult (ADMIN required)
+function Accounts.pauseAccount(payload, authResult)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.ADMIN)
+    if not resolved then
+        return false, rerr
+    end
+
+    if not utils.isNonEmptyString(payload.username) then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+
+    local acct = db.getAccount(payload.username)
+    if not acct then
+        return false, constants.ERROR.ACCOUNT_NOT_FOUND
+    end
+
+    -- u cant pause the system, u crazy?
+    if acct.permission == constants.PERMISSION.SYSTEM and resolved.permission ~= constants.PERMISSION.SYSTEM then
+        return false, constants.ERROR.PERMISSION_DENIED
+    end
+
+    acct.paused = true
+
+    local ok, err = db.saveAccount(acct)
+    if not ok then
+        return false, constants.ERROR.SERVER_ERROR
+    end
+    return true, sanitiseAccount(db.getAccount(acct.username))
+end
+
+--- Unpause an account.
+--- @param payload table {username}
+--- @param authResult table AuthResult (ADMIN required)
+function Accounts.unpauseAccount(payload, authResult)
+    local resolved, rerr = Auth.requirePermission(authResult, constants.PERMISSION.ADMIN)
+    if not resolved then
+        return false, rerr
+    end
+
+    if not utils.isNonEmptyString(payload.username) then
+        return false, constants.ERROR.INVALID_PACKET
+    end
+
+    local acct = db.getAccount(payload.username)
+    if not acct then
+        return false, constants.ERROR.ACCOUNT_NOT_FOUND
+    end
+
+    acct.paused = false
 
     local ok, err = db.saveAccount(acct)
     if not ok then

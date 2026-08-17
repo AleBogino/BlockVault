@@ -32,6 +32,11 @@ function Auth.resolve(session, username)
         return nil, constants.ERROR.ACCOUNT_NOT_FOUND
     end
 
+    -- Paused accounts are frozen
+    if acct.paused then
+        return nil, constants.ERROR.ACCOUNT_PAUSED
+    end
+
     return {
         account = acct,
         permission = acct.permission or constants.PERMISSION.USER,

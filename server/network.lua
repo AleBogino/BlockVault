@@ -2,7 +2,7 @@
 if not package.path:find("^/%?%.lua;", 1) then
     package.path = "/?.lua;/?/init.lua;" .. package.path
 end
-local chatHandler = require "server.chat_handler"
+local Chat = require "server.chat"
 local packet = require "shared.packet"
 local Peripheral = require "shared.peripheral"
 local constants = require "shared.constants"
@@ -52,23 +52,7 @@ handleChatEvent = function(protocolInstance, message, username)
     if not message or not username then
         return false
     end
-    chatHandler.handleChatEvent(message, username, {
-        onLogin = function(playerName, code)
-            protocolInstance:onChatLogin(playerName, code)
-        end,
-        onHelp = function(playerName)
-            protocolInstance:onChatHelp(playerName)
-        end,
-        onTransfer = function(playerName, args)
-            protocolInstance:onChatTransfer(playerName, args)
-        end,
-        onList = function(playerName)
-            protocolInstance:onChatList(playerName)
-        end,
-        onBalance = function(playerName)
-            protocolInstance:onChatBalance(playerName)
-        end,
-    })
+    Chat.handleChat(message, username)
     return true
 end
 
