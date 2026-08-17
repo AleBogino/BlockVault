@@ -9,8 +9,8 @@ function M.parse(message)
     local trimmed = message:match("^%s*(.-)%s*$")
     if not trimmed then return nil end
 
-    -- match .bvault
-    local cmd, args = trimmed:match("^%.bvault%s+(%S+)%s*(.*)$")
+    -- match $
+    local cmd, args = trimmed:match("^%$%s+(%S+)%s*(.*)$")
     if not cmd then return nil end
 
     cmd = cmd:lower()

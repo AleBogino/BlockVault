@@ -92,7 +92,7 @@ function M.open()
     if M.chatBox then
         print("[NET] Chat box found: " .. tostring(M.chatBoxSide))
     else
-        print("[NET] WARNING: no chat box attached - .bvault login will not work")
+        print("[NET] WARNING: no chat box attached - $$ login will not work")
     end
 
     return true
