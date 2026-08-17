@@ -76,8 +76,8 @@ function Keypad.draw(mon, layout, state, opts)
     -- Cancel button
     if opts.onCancel then
         ScreenManager.register(Button.new(
-            ox + confirmW + gap, layout.confirmButtonRow,
-            ox + confirmW + gap + cancelW - 1, layout.confirmButtonRow,
+            ox - 3 + confirmW + gap, layout.confirmButtonRow,
+            ox - 3 + confirmW + gap + cancelW - 1, layout.confirmButtonRow,
             "Cancel",
             opts.onCancel,
             { bg = colors.red, fg = colors.white }
