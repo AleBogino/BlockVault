@@ -19,7 +19,7 @@ M.lastSentAt = 0
 M.timer = nil
 
 local DEFAULTS = {
-    prefix   = "Bank",
+    prefix   = "BlockVault",
     brackets = "[]",
 }
 
@@ -211,27 +211,23 @@ local function dispatchChat(player, message, options)
 
     M.lastSentAt = os.epoch("utc")
 
-    -- bake chat prefix
-    local prefix = options.prefix or DEFAULTS.prefix
-    if prefix and prefix ~= "" then
-        message = "[" .. prefix .. "] " .. message
-    end
-
+    local opts = chatOptions(player, options)
     local called, result, callErr
-    if player and player ~= "" then
-        if M.box.sendMessageToPlayer then
-            -- positional private: sendMessageToPlayer(message, player)
-            called, result, callErr = pcall(M.box.sendMessageToPlayer, message, player)
-        else
-            -- positional: sendMessage(message, player)
-            called, result, callErr = pcall(M.box.sendMessage, message, player)
-            if not called then
-                called, result, callErr = pcall(M.box.sendMessage, message, chatOptions(player, options))
-            end
+    called, result, callErr = pcall(M.box.sendMessage, message, opts)
+    if not called then
+        local prefix = opts.prefix
+        if prefix and prefix ~= "" then
+            message = "[" .. prefix .. "] " .. message
         end
-    else
-        -- broadcast to everyone
-        called, result, callErr = pcall(M.box.sendMessage, message)
+        if player and player ~= "" then
+            if M.box.sendMessageToPlayer then
+                called, result, callErr = pcall(M.box.sendMessageToPlayer, message, player)
+            else
+                called, result, callErr = pcall(M.box.sendMessage, message, player)
+            end
+        else
+            called, result, callErr = pcall(M.box.sendMessage, message)
+        end
     end
 
     if not called then
@@ -257,34 +253,35 @@ local function dispatchChatFormatted(player, messageJson, options)
 
     M.lastSentAt = os.epoch("utc")
 
-    local prefix = options.prefix or DEFAULTS.prefix
-    if prefix and prefix ~= "" and textutils then
-        local ok, parsed = pcall(textutils.unserialiseJSON, messageJson)
-        if ok and parsed ~= nil then
-            local wrapped = { { text = "[" .. prefix .. "] " }, parsed }
-            local okJson, json = pcall(textutils.serialiseJSON, wrapped)
-            if okJson then
-                messageJson = json
-            end
-        end
-    end
-
+    local opts = chatOptions(player, options)
     local called, result, callErr
-    if player and player ~= "" then
-        if M.box.sendFormattedMessageToPlayer then
-            -- positional private: sendFormattedMessageToPlayer(json, player)
-            called, result, callErr = pcall(M.box.sendFormattedMessageToPlayer, messageJson, player)
-        else
-            -- positional: sendFormattedMessage(json, player)
-            called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, player)
-            if not called then
-                -- fallback
-                called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, chatOptions(player, options))
+
+    -- 0.8 table-based API: sendFormattedMessage(json, { player=, prefix=, ... }).
+    called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, opts)
+
+    -- Older positional API has no prefix slot, so bake the prefix into the
+    -- JSON text component instead.
+    if not called then
+        local prefix = opts.prefix
+        if prefix and prefix ~= "" and textutils then
+            local ok, parsed = pcall(textutils.unserialiseJSON, messageJson)
+            if ok and parsed ~= nil then
+                local wrapped = { { text = "[" .. prefix .. "] " }, parsed }
+                local okJson, json = pcall(textutils.serialiseJSON, wrapped)
+                if okJson then
+                    messageJson = json
+                end
             end
         end
-    else
-        -- broadcast to everyone
-        called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson)
+        if player and player ~= "" then
+            if M.box.sendFormattedMessageToPlayer then
+                called, result, callErr = pcall(M.box.sendFormattedMessageToPlayer, messageJson, player)
+            else
+                called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, player)
+            end
+        else
+            called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson)
+        end
     end
 
     if not called then
