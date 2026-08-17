@@ -2,9 +2,8 @@
 local Button = require "client.ui.button"
 local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
-local Net = require "client.ui.net"
 local constants = require "shared.constants"
-local TextWrap = require "client.ui.textwrap"
+local Draw = require "client.ui.draw"
 
 local MainMenu = {}
 
@@ -16,23 +15,23 @@ function MainMenu.draw(state, acct, message)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     -- Header
-    mon.setBackgroundColor(colors.blue)
-    mon.setTextColor(colors.white)
-    mon.setCursorPos(1, 1)
     local balanceText = "$" .. string.format("%.2f", acct.balance or 0)
     local prefix = lay.width >= 20 and " User: " or ""
     local maxUser = lay.width - #prefix
     if maxUser < 1 then
         maxUser = 1
     end
-    local username = acct.username or "?"
-    if #username > maxUser then
-        username = username:sub(1, maxUser)
-    end
+    local username = Draw.truncate(acct.username or "?", maxUser)
+    balanceText = Draw.truncate(balanceText, lay.width)
+
+    mon.setBackgroundColor(colors.blue)
+    mon.setTextColor(colors.white)
+    Draw.fillLine(mon, 1, lay.width, { bg = colors.blue })
+    Draw.fillLine(mon, 2, lay.width, { bg = colors.blue })
+    mon.setCursorPos(1, 1)
     mon.write(prefix .. username)
     mon.setCursorPos(1, 2)
     mon.write(balanceText)
@@ -40,8 +39,7 @@ function MainMenu.draw(state, acct, message)
 
     -- Status message
     if message then
-        mon.setTextColor(colors.yellow)
-        TextWrap.write(mon, message, 2, 3)
+        Draw.banner(mon, message, 2, 3)
     end
 
     -- Buttons

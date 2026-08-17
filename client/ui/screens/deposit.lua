@@ -1,10 +1,9 @@
-local Button = require "client.ui.button"
-local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
 local ME = require "shared.me"
 local TextWrap = require "client.ui.textwrap"
+local Draw = require "client.ui.draw"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -14,72 +13,50 @@ local PHASE = {
     CONFIRM = "confirm"
 }
 
-local function shortName(coinId)
-    return coinId:match(":([^:]+)$") or coinId
-end
-
 local function drawInsert(state, acct, message)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Deposit")
+    Draw.header(mon, lay, "Deposit")
 
     mon.setTextColor(colors.white)
     local y = lay.headerRow + 1
     y = TextWrap.write(mon, "Insert your coins into the barrel now.", 3, y)
 
     if message then
-        mon.setTextColor(colors.yellow)
-        TextWrap.write(mon, message, 2, y + 1)
+        Draw.banner(mon, message, 2, y + 1)
     end
 
-    local btnW = 14
-    local bx = math.floor((lay.width - btnW) / 2) + 1
+    local continueCb = function()
+        local inv = state.inventoryMgr
+        if not inv then
+            Deposit.draw(state, acct, PHASE.INSERT, "No barrel configured on this terminal.")
+            return
+        end
+        local total, breakdown, scanErr = inv:scan()
+        if scanErr then
+            print("[CLI][DEPOSIT] scan error: " .. tostring(scanErr))
+            Deposit.draw(state, acct, PHASE.INSERT, scanErr)
+            return
+        end
+        print(("[CLI][DEPOSIT] scan total=%d breakdown=%s"):format(total, textutils.serialize(breakdown or {})))
+        Deposit.draw(state, acct, PHASE.CONFIRM, nil, breakdown, total)
+    end
 
-    ScreenManager.register(Button.new(bx, lay.confirmButtonRow - 2, bx + btnW - 1, lay.confirmButtonRow - 2,
-        "  Continue  ", function()
-            local inv = state.inventoryMgr
-            if not inv then
-                Deposit.draw(state, acct, PHASE.INSERT, "No barrel configured on this terminal.")
-                return
-            end
-            local total, breakdown, scanErr = inv:scan()
-            if scanErr then
-                print("[CLI][DEPOSIT] scan error: " .. tostring(scanErr))
-                Deposit.draw(state, acct, PHASE.INSERT, scanErr)
-                return
-            end
-            print(("[CLI][DEPOSIT] scan total=%d breakdown=%s"):format(total, textutils.serialize(breakdown or {})))
-            Deposit.draw(state, acct, PHASE.CONFIRM, nil, breakdown, total)
-        end, {
-            bg = colors.green,
-            fg = colors.white
-        })):draw(mon)
-
-    ScreenManager.register(Button.new(bx, lay.confirmButtonRow, bx + btnW - 1, lay.confirmButtonRow, "  Back  ",
-        function()
-            Router.switch(MainMenu, acct)
-        end, {
-            bg = colors.gray,
-            fg = colors.white
-        })):draw(mon)
+    Draw.confirmCancelRow(mon, lay, continueCb, function()
+        Router.switch(MainMenu, acct)
+    end, "  Continue  ", "  Back  ")
 end
 
 local function drawConfirm(state, acct, breakdown, total)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Deposit Review")
+    Draw.header(mon, lay, "Deposit Review")
 
     local y = lay.headerRow + 1
     mon.setTextColor(colors.white)
@@ -96,7 +73,7 @@ local function drawConfirm(state, acct, breakdown, total)
             local n = breakdown and breakdown[coinId]
             if n and n > 0 then
                 local value = constants.COIN_VALUES[coinId] or 0
-                local line = ("%d x %s = %d units"):format(n, shortName(coinId), n * value)
+                local line = ("%d x %s = %d units"):format(n, Draw.shortCoinName(coinId), n * value)
                 y = TextWrap.write(mon, line, 3, y)
             end
         end
@@ -115,14 +92,11 @@ local function drawConfirm(state, acct, breakdown, total)
         TextWrap.write(mon, "Physical deposits unavailable on this terminal.", 3, y)
     end
 
-    local btnW = 14
-    local bx = math.floor((lay.width - btnW) / 2) + 1
-
+    local confirmCb = nil
     if available and total > 0 then
-        ScreenManager.register(Button.new(bx, lay.confirmButtonRow - 2, bx + btnW - 1, lay.confirmButtonRow - 2,
-            "  Confirm  ", function()
-                local inv = state.inventoryMgr
-                local me = state.meBridge
+        confirmCb = function()
+            local inv = state.inventoryMgr
+            local me = state.meBridge
 
                 -- 1) Import coins from the barrel (adjacent to the ME Bridge on state.meSide)
                 local imported, importedValue, importErrs = ME.importCoins(me, state.meSide, breakdown)
@@ -168,20 +142,13 @@ local function drawConfirm(state, acct, breakdown, total)
                 local newBalance = payload.data and payload.data.balance or acct.balance
                 acct.balance = newBalance
                 Router.switch(MainMenu, acct, ("Deposited %d units. New balance: %d"):format(importedValue, newBalance))
-            end, {
-                bg = colors.green,
-                fg = colors.white
-            })):draw(mon)
+        end
     end
 
-    -- cancel button
-    ScreenManager.register(Button.new(bx, lay.confirmButtonRow, bx + btnW - 1, lay.confirmButtonRow, "  Cancel  ",
-        function()
-            Deposit.draw(state, acct, PHASE.INSERT)
-        end, {
-            bg = colors.gray,
-            fg = colors.white
-        })):draw(mon)
+    -- confirm / cancel buttons
+    Draw.confirmCancelRow(mon, lay, confirmCb, function()
+        Deposit.draw(state, acct, PHASE.INSERT)
+    end, "  Confirm  ", "  Cancel  ")
 end
 
 --- @param state table shared state (needs .inventoryMgr and .meBridge)

@@ -2,6 +2,7 @@
 -- Static state
 
 local TextWrap = require "client.ui.textwrap"
+local Draw = require "client.ui.draw"
 
 local FatalError = {}
 
@@ -15,21 +16,19 @@ function FatalError.draw(state)
 
     local ok = pcall(function()
         local w, h = mon.getSize()
+        local lay = { width = w, height = h }
 
-        mon.setBackgroundColor(colors.black)
-        mon.clear()
+        Draw.clear(mon)
 
         local mid = math.max(2, math.floor(h / 2))
 
         -- Red band.
-        mon.setBackgroundColor(colors.red)
-        mon.setCursorPos(1, mid - 1)
-        mon.write(string.rep(" ", w))
+        Draw.fillLine(mon, mid - 1, w, { bg = colors.red })
 
         -- Title on the band.
         local title = "Fatal error"
         mon.setTextColor(colors.white)
-        mon.setCursorPos(math.max(1, math.floor((w - #title) / 2) + 1), mid - 1)
+        mon.setCursorPos(Draw.centerCol(lay, title), mid - 1)
         mon.write(title)
 
         -- Subtitle below the band.
@@ -38,7 +37,7 @@ function FatalError.draw(state)
         mon.setTextColor(colors.white)
         local subtitleLines = TextWrap.wrap(subtitle, 15)
         for i, line in ipairs(subtitleLines) do
-            mon.setCursorPos(math.max(1, math.floor((w - #line) / 2) + 1), math.min(h, mid + i))
+            mon.setCursorPos(Draw.centerCol(lay, line), math.min(h, mid + i))
             mon.write(line)
         end
     end)

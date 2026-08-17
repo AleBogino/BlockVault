@@ -1,32 +1,24 @@
 -- Withdraw screen: amount entry via keypad
-local Button = require "client.ui.button"
-local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Net = require "client.ui.net"
 local Keypad = require "client.ui.keypad"
 local constants = require "shared.constants"
 local ME = require "shared.me"
 local TextWrap = require "client.ui.textwrap"
+local Draw = require "client.ui.draw"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
 local Withdraw = {}
-
-local function shortName(coinId)
-    return coinId:match(":([^:]+)$") or coinId
-end
 
 -- coin breakdown approved by server
 local function drawReview(state, acct, amount, breakdown)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Withdraw Review")
+    Draw.header(mon, lay, "Withdraw")
 
     local y = lay.headerRow + 1
     mon.setTextColor(colors.white)
@@ -38,7 +30,7 @@ local function drawReview(state, acct, amount, breakdown)
         if n and n > 0 then
             local value = constants.COIN_VALUES[coinId] or 0
             mon.setTextColor(colors.white)
-            y = TextWrap.write(mon, ("%d x %s = %d"):format(n, shortName(coinId), n * value), 2, y)
+            y = TextWrap.write(mon, ("%d x %s = %d"):format(n, Draw.shortCoinName(coinId), n * value), 2, y)
         end
     end
 
@@ -46,12 +38,8 @@ local function drawReview(state, acct, amount, breakdown)
     y = TextWrap.write(mon, ("Balance: %d"):format(acct.balance or 0), 2, y)
     y = TextWrap.write(mon, ("After: %d"):format((acct.balance or 0) - amount), 2, y)
 
-    local btnW = 14
-    local bx = math.floor((lay.width - btnW) / 2) + 1
-
-    ScreenManager.register(Button.new(bx, lay.confirmButtonRow - 2, bx + btnW - 1, lay.confirmButtonRow - 2,
-        "  Confirm  ", function()
-            local me = state.meBridge
+    local confirmCb = function()
+        local me = state.meBridge
             if not me then
                 Withdraw.draw(state, acct, nil, "No ME Bridge on this terminal.")
                 return
@@ -99,18 +87,11 @@ local function drawReview(state, acct, amount, breakdown)
             acct.balance = newBalance
             Router.switch(MainMenu, acct,
                 ("Withdrew %d units. New balance: %d"):format(amount, newBalance))
-        end, {
-            bg = colors.green,
-            fg = colors.white
-        })):draw(mon)
+    end
 
-    ScreenManager.register(Button.new(bx, lay.confirmButtonRow, bx + btnW - 1, lay.confirmButtonRow, "  Cancel  ",
-        function()
-            Withdraw.draw(state, acct, nil, "Withdraw cancelled.")
-        end, {
-            bg = colors.gray,
-            fg = colors.white
-        })):draw(mon)
+    Draw.confirmCancelRow(mon, lay, confirmCb, function()
+        Withdraw.draw(state, acct, nil, "Withdraw cancelled.")
+    end, "  Confirm  ", "  Cancel  ")
 end
 
 --- Draw it!
@@ -122,13 +103,10 @@ function Withdraw.draw(state, acct, target, message)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     -- header
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Withdraw")
+    Draw.header(mon, lay, "Withdraw")
 
     local targetUser = target or acct.username
     mon.setTextColor(colors.white)
@@ -137,8 +115,7 @@ function Withdraw.draw(state, acct, target, message)
 
     -- message
     if message then
-        mon.setTextColor(colors.yellow)
-        TextWrap.write(mon, message, 2, y + 1)
+        Draw.banner(mon, message, 2, y + 1)
     end
 
     state.inputBuffer = ""

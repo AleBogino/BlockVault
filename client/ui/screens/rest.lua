@@ -2,14 +2,13 @@ if not package.path:find("^/%?%.lua;", 1) then
     package.path = "/?.lua;/?/init.lua;" .. package.path
 end
 
-local Button = require "client.ui.button"
 local ScreenManager = require "client.ui.screen_manager"
 local Router = require "client.ui.router"
 local Layout = require "client.ui.layout"
 local Net = require "client.ui.net"
 local constants = require "shared.constants"
 local packet = require "shared.packet"
-local TextWrap = require "client.ui.textwrap"
+local Draw = require "client.ui.draw"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -26,18 +25,13 @@ function Rest.draw(state, message)
     local mon = state.monitor
     local lay = state.layout
 
-    local function centerCol(text)
-        return math.max(1, math.floor((lay.width - #text) / 2) + 1)
-    end
-
     ScreenManager.reset()
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     -- Title
     local title = "BlockBank ATM"
     mon.setTextColor(colors.cyan)
-    mon.setCursorPos(centerCol(title), 4)
+    mon.setCursorPos(Draw.centerCol(lay, title), 4)
     mon.write(title)
 
     -- Tagline
@@ -48,26 +42,18 @@ function Rest.draw(state, message)
         tagline = "Coin banking"
     end
     mon.setTextColor(colors.lightGray)
-    TextWrap.writeCentered(mon, tagline, 6)
+    Draw.writeCentered(mon, lay, tagline, 6)
 
     -- Status message
     if message then
         mon.setTextColor(colors.yellow)
-        TextWrap.writeCentered(mon, message, 9)
+        Draw.writeCentered(mon, lay, message, 9)
     end
 
     -- Start button
-    local btnW = 11
-    local btnX = math.floor((lay.width - btnW) / 2) + 1
-    local btnY = 12
-    ScreenManager.register(Button.new(
-        btnX, btnY, btnX + btnW - 1, btnY + 2,
-        "  Start  ",
-        function()
-            Rest.startLogin(state)
-        end,
-        { bg = colors.blue, fg = colors.white }
-    )):draw(mon)
+    Draw.centeredButton(mon, lay, "  Start  ", 14, 11, 3, function()
+        Rest.startLogin(state)
+    end, { bg = colors.blue, fg = colors.white })
 end
 
 --- Draw the "wait for chat login" screen
@@ -78,48 +64,36 @@ local function drawLoginWait(state, loginCode, flags)
     local mon = state.monitor
     local lay = state.layout
 
-    local function centerCol(text)
-        return math.max(1, math.floor((lay.width - #text) / 2) + 1)
-    end
-
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     mon.setTextColor(colors.cyan)
     local title = "BlockBank ATM"
-    mon.setCursorPos(centerCol(title), 3)
+    mon.setCursorPos(Draw.centerCol(lay, title), 3)
     mon.write(title)
 
     mon.setTextColor(colors.white)
     local instruction = "Type in chat:"
-    mon.setCursorPos(centerCol(instruction), 5)
+    mon.setCursorPos(Draw.centerCol(lay, instruction), 5)
     mon.write(instruction)
 
     -- Split the command so the 4-char code is never clipped on narrow screens
     local cmdPrefix = ".bvault login"
     mon.setTextColor(colors.green)
     mon.setBackgroundColor(colors.gray)
-    mon.setCursorPos(centerCol(cmdPrefix), 7)
+    mon.setCursorPos(Draw.centerCol(lay, cmdPrefix), 7)
     mon.write(cmdPrefix)
 
-    mon.setCursorPos(centerCol(loginCode), 8)
+    mon.setCursorPos(Draw.centerCol(lay, loginCode), 8)
     mon.write(loginCode)
     mon.setBackgroundColor(colors.black)
 
     mon.setTextColor(colors.lightGray)
-    TextWrap.writeCentered(mon, "Waiting for chat", 10)
+    Draw.writeCentered(mon, lay, "Waiting for chat", 10)
 
-    local btnW = 9
-    local btnX = math.floor((lay.width - btnW) / 2) + 1
     ScreenManager.reset()
-    ScreenManager.register(Button.new(
-        btnX, 12, btnX + btnW - 1, 13,
-        "  Cancel  ",
-        function()
-            flags.cancelled = true
-        end,
-        { bg = colors.gray, fg = colors.white }
-    )):draw(mon)
+    Draw.centeredButton(mon, lay, "  Cancel  ", 12, 9, 2, function()
+        flags.cancelled = true
+    end, { bg = colors.gray, fg = colors.white })
 end
 
 --- Initiate the chat-based login flow
@@ -222,32 +196,19 @@ function Rest.drawCreateAccountPrompt(state, username)
     local mon = state.monitor
     local lay = state.layout
 
-    local function centerCol(text)
-        return math.max(1, math.floor((lay.width - #text) / 2) + 1)
-    end
-
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     mon.setTextColor(colors.yellow)
-    TextWrap.writeCentered(mon, "No account for " .. username, 4)
+    Draw.writeCentered(mon, lay, "No account for " .. username, 4)
 
     local msg2 = "Create one?"
-    mon.setCursorPos(centerCol(msg2), 6)
+    mon.setCursorPos(Draw.centerCol(lay, msg2), 6)
     mon.write(msg2)
 
     -- Create Account button
     local btnW = math.min(16, lay.width)
-    local btnX = math.floor((lay.width - btnW) / 2) + 1
-    local createLabel = "Create Account"
-    if #createLabel > btnW then
-        createLabel = createLabel:sub(1, btnW)
-    end
     ScreenManager.reset()
-    ScreenManager.register(Button.new(
-        btnX, 9, btnX + btnW - 1, 10,
-        createLabel,
-        function()
+    Draw.centeredButton(mon, lay, "Create Account", 9, btnW, 2, function()
             local payload, err = Net.sendAndReceive(state, constants.PACKET.CREATE_ACCOUNT, {
                 username = username,
                 initialBalance = 100,
@@ -272,19 +233,12 @@ function Rest.drawCreateAccountPrompt(state, username)
             else
                 Rest.draw(state, "Account created! Tap Start to log in.")
             end
-        end,
-        { bg = colors.green, fg = colors.white }
-    )):draw(mon)
+        end, { bg = colors.green, fg = colors.white })
 
     -- Back button
-    ScreenManager.register(Button.new(
-        btnX, 12, btnX + btnW - 1, 13,
-        "     Back     ",
-        function()
-            Rest.draw(state)
-        end,
-        { bg = colors.gray, fg = colors.white }
-    )):draw(mon)
+    Draw.centeredButton(mon, lay, "     Back     ", 12, btnW, 2, function()
+        Rest.draw(state)
+    end, { bg = colors.gray, fg = colors.white })
 end
 
 return Rest

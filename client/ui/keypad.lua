@@ -2,6 +2,7 @@
 
 local Button = require "client.ui.button"
 local ScreenManager = require "client.ui.screen_manager"
+local Draw = require "client.ui.draw"
 
 local Keypad = {}
 -- 3x4 grid
@@ -19,15 +20,15 @@ function Keypad.draw(mon, layout, state, opts)
     -- input fieldLabel
     mon.setBackgroundColor(colors.black)
     mon.setTextColor(colors.white)
-    mon.setCursorPos(3, layout.inputFieldRow)
     local label = (opts.fieldLabel or "Amount") .. ": "
     local value = state.inputBuffer or ""
-    local display = label .. value
-    if #display > layout.width - 3 then
-        display = display:sub(1, layout.width - 3)
-    end
+    local display = Draw.truncate(label .. value, layout.width - 3)
+    mon.setCursorPos(3, layout.inputFieldRow)
     mon.write(display)
-    mon.write(string.rep(" ", math.max(0, layout.width - 3 - #display)))
+    local remaining = layout.width - 3 - #display
+    if remaining > 0 then
+        Draw.fillLine(mon, layout.inputFieldRow, remaining, { x = 3 + #display, bg = colors.black })
+    end
 
     -- Numpad
     local keyW = 2

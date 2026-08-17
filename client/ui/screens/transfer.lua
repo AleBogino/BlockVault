@@ -6,6 +6,7 @@ local Net = require "client.ui.net"
 local Keypad = require "client.ui.keypad"
 local constants = require "shared.constants"
 local TextWrap = require "client.ui.textwrap"
+local Draw = require "client.ui.draw"
 
 local MainMenu = require "client.ui.screens.main_menu"
 
@@ -22,13 +23,10 @@ local function drawAmountStage(state, acct, recipient, message)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     -- header
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Transfer")
+    Draw.header(mon, lay, "Transfer")
 
     mon.setTextColor(colors.white)
     local y = lay.headerRow + 1
@@ -36,8 +34,7 @@ local function drawAmountStage(state, acct, recipient, message)
 
     -- message
     if message then
-        mon.setTextColor(colors.yellow)
-        TextWrap.write(mon, message, 2, y + 1)
+        Draw.banner(mon, message, 2, y + 1)
     end
 
     state.inputBuffer = ""
@@ -102,13 +99,10 @@ local function drawRecipientStage(state, acct, players, page, message)
     local mon = state.monitor
     local lay = state.layout
 
-    mon.setBackgroundColor(colors.black)
-    mon.clear()
+    Draw.clear(mon)
 
     -- header
-    mon.setTextColor(colors.cyan)
-    mon.setCursorPos(3, lay.headerRow)
-    mon.write("Pick Recipient")
+    Draw.header(mon, lay, "Pick Recipient")
 
     mon.setTextColor(colors.white)
     local y = lay.headerRow + 1
@@ -116,8 +110,7 @@ local function drawRecipientStage(state, acct, players, page, message)
 
     -- message
     if message then
-        mon.setTextColor(colors.yellow)
-        TextWrap.write(mon, message, 2, y + 1)
+        Draw.banner(mon, message, 2, y + 1)
     end
 
     -- Player list
@@ -138,7 +131,7 @@ local function drawRecipientStage(state, acct, players, page, message)
                 -- Skip self
                 goto continue
             end
-            local label = (" " .. name):sub(1, math.max(1, lay.width - 4))
+            local label = Draw.truncate(" " .. name, lay.width - 4)
             mon.setTextColor(colors.white)
             mon.setCursorPos(4, row)
             mon.write(label)
@@ -153,9 +146,7 @@ local function drawRecipientStage(state, acct, players, page, message)
             })
             ScreenManager.register(btn)
             -- Draw underline
-            mon.setBackgroundColor(colors.gray)
-            mon.setCursorPos(4, row + 1)
-            mon.write(string.rep(" ", math.min(20, lay.width - 5)))
+            Draw.fillLine(mon, row + 1, math.min(20, lay.width - 5), { x = 4, bg = colors.gray })
             mon.setBackgroundColor(colors.black)
 
             row = row + 2
@@ -182,8 +173,7 @@ local function drawRecipientStage(state, acct, players, page, message)
         -- Page indicator
         mon.setTextColor(colors.white)
         local pageStr = "Page " .. tostring(page) .. "/" .. tostring(totalPages)
-        local pc = math.floor((lay.width - #pageStr) / 2) + 1
-        mon.setCursorPos(pc, lay.confirmButtonRow)
+        mon.setCursorPos(Draw.centerCol(lay, pageStr), lay.confirmButtonRow)
         mon.write(pageStr)
 
         -- Next page
