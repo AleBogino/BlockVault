@@ -236,7 +236,7 @@ function ServerProtocol:_handleLoginRequest(senderId, pkt, send)
     print("[SRV] Login code " .. code .. " issued to client " .. tostring(senderId))
 end
 
---- called on "$$login <code>"
+--- called on "$bank login <code>"
 --- @param username string the player who sent the chat
 --- @param code string the login code from the chat message
 function ServerProtocol:onChatLogin(username, code)
