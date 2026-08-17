@@ -39,7 +39,7 @@ function Rest.draw(state, message)
     if lay.width >= 32 then
         tagline = "Give us your money, we'll keep it."
     else
-        tagline = "Coin banking"
+        tagline = "Secure storage"
     end
     mon.setTextColor(colors.lightGray)
     Draw.writeCentered(mon, lay, tagline, 6)
@@ -77,7 +77,7 @@ local function drawLoginWait(state, loginCode, flags)
     mon.write(instruction)
 
     -- Split the command so the 4-char code is never clipped on narrow screens
-    local cmdPrefix = "$.bvault login"
+    local cmdPrefix = "$$ login"
     mon.setTextColor(colors.green)
     mon.setCursorPos(Draw.centerCol(lay, cmdPrefix), 7)
     mon.write(cmdPrefix)
