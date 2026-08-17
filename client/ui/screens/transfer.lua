@@ -98,8 +98,10 @@ drawConfirmStage = function(state, acct, recipient, amount)
             local friendly
             if code == constants.ERROR.INSUFFICIENT_FUNDS then
                 friendly = "Insufficient funds."
-            elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
+            elseif code == constants.ERROR.DESTINATION_NO_ACCOUNT then
                 friendly = "Recipient '" .. recipient .. "' does not have a BlockBank account."
+            elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
+                friendly = "Your account was not found."
             elseif code == constants.ERROR.PERMISSION_DENIED then
                 friendly = "You can only transfer from your own account."
             else

@@ -184,6 +184,74 @@ local function dispatchFormatted(player, titleJson, messageJson, options)
     return nil, errMsg
 end
 
+--- peripheral call for a plain chat message (optionally private to a player)
+--- @param player  string|nil player name/uuid, nil broadcasts to everyone
+--- @param message string  chat message
+--- @param options table { prefix=, brackets=, bracketColor=, utf8= }
+local function dispatchChat(player, message, options)
+    if not M.box then
+        return nil, "no chat_box peripheral attached"
+    end
+
+    M.lastSentAt = os.epoch("utc")
+
+    local opts = {
+        utf8         = options.utf8,
+        prefix       = options.prefix or DEFAULTS.prefix,
+        brackets     = options.brackets or DEFAULTS.brackets,
+        bracketColor = options.bracketColor,
+    }
+    if player and player ~= "" then
+        opts.player = player
+    end
+
+    local called, result, callErr = pcall(M.box.sendMessage, message, opts)
+    if not called then
+        print("[TOAST] chat send error for " .. tostring(player) .. ": " .. tostring(result))
+        return nil, tostring(result)
+    end
+    if result == true then
+        return true
+    end
+    local errMsg = tostring(callErr or result or "chat send failed")
+    print("[TOAST] chat send failed for " .. tostring(player) .. ": " .. errMsg)
+    return nil, errMsg
+end
+
+--- peripheral call for a formatted chat message (optionally private to a player)
+--- @param player      string|nil player name/uuid, nil broadcasts to everyone
+--- @param messageJson string|nil  JSON text component
+--- @param options     table { prefix=, brackets=, bracketColor=, utf8= }
+local function dispatchChatFormatted(player, messageJson, options)
+    if not M.box then
+        return nil, "no chat_box peripheral attached"
+    end
+
+    M.lastSentAt = os.epoch("utc")
+
+    local opts = {
+        utf8         = options.utf8,
+        prefix       = options.prefix or DEFAULTS.prefix,
+        brackets     = options.brackets or DEFAULTS.brackets,
+        bracketColor = options.bracketColor,
+    }
+    if player and player ~= "" then
+        opts.player = player
+    end
+
+    local called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, opts)
+    if not called then
+        print("[TOAST] formatted chat send error for " .. tostring(player) .. ": " .. tostring(result))
+        return nil, tostring(result)
+    end
+    if result == true then
+        return true
+    end
+    local errMsg = tostring(callErr or result or "formatted chat send failed")
+    print("[TOAST] formatted chat send failed for " .. tostring(player) .. ": " .. errMsg)
+    return nil, errMsg
+end
+
 --- Send a plain toast notification.
 --- @param player  string  player name or uuid (required)
 --- @param title   string  toast title (required)
@@ -257,6 +325,69 @@ function M.sendFormatted(player, title, message, options)
     return dispatchFormatted(player, titleJson, messageJson, options)
 end
 
+--- Send a plain chat message
+--- @param player  string|nil  player name/uuid to privately message, or nil to broadcast
+--- @param message string        chat message
+--- @param options table|nil { prefix=, brackets=, bracketColor=, utf8= }
+--- @return boolean|nil ok
+--- @return string|nil err
+function M.sendMessage(player, message, options)
+    local ok, err = M.ready()
+    if not ok then
+        return nil, err
+    end
+    if type(message) ~= "string" or message == "" then
+        return nil, "message required"
+    end
+
+    options = options or {}
+
+    local now = os.epoch("utc")
+    if now - M.lastSentAt < COOLDOWN_MS then
+        M.queue[#M.queue + 1] = {
+            player = player,
+            message = message,
+            options = options,
+            chat = true,
+        }
+        armTimer((M.lastSentAt + COOLDOWN_MS - now) / 1000)
+        return true
+    end
+
+    return dispatchChat(player, message, options)
+end
+
+--- Send a formatted chat message
+--- @param player  string|nil  player name/uuid to privately message, or nil to broadcast
+--- @param message string|table  JSON string or component table
+--- @param options table|nil { prefix=, brackets=, bracketColor=, utf8= }
+--- @return boolean|nil ok
+--- @return string|nil err
+function M.sendFormattedMessage(player, message, options)
+    local ok, err = M.ready()
+    if not ok then
+        return nil, err
+    end
+
+    options = options or {}
+    local messageJson = toJson(message)
+
+    local now = os.epoch("utc")
+    if now - M.lastSentAt < COOLDOWN_MS then
+        M.queue[#M.queue + 1] = {
+            player = player,
+            messageJson = messageJson,
+            options = options,
+            chat = true,
+            formatted = true,
+        }
+        armTimer((M.lastSentAt + COOLDOWN_MS - now) / 1000)
+        return true
+    end
+
+    return dispatchChatFormatted(player, messageJson, options)
+end
+
 -- ---------------------------- convenience wrappers ---------------------------- --
 
 --- Quick toast with the default "Bank" title.
@@ -294,7 +425,13 @@ function M.pump()
     end
 
     local item = table.remove(M.queue, 1)
-    if item.formatted then
+    if item.chat then
+        if item.formatted then
+            dispatchChatFormatted(item.player, item.messageJson, item.options)
+        else
+            dispatchChat(item.player, item.message, item.options)
+        end
+    elseif item.formatted then
         dispatchFormatted(item.player, item.titleJson, item.messageJson, item.options)
     else
         dispatch(item.player, item.title, item.message, item.options)

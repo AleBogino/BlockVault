@@ -294,6 +294,121 @@ function ServerProtocol:onChatLogin(username, code)
     end
 end
 
+--- Handle "$bank help" - show all chat commands
+--- @param username string the player who sent the chat
+function ServerProtocol:onChatHelp(username)
+    print("[SRV][CHAT] help requested by " .. tostring(username))
+    Toast.sendMessage(username, table.concat({
+        "bank help - show this list",
+        "bank login <code> - link a computer",
+        "bank balance - your balance",
+        "bank transfer <player> <amount> - send money",
+        "bank list - top 10 accounts",
+    }, "\n"))
+end
+
+--- Handle "$bank transfer <to> <amount>" - send money from the sender's account
+--- @param username string the player who sent the chat
+--- @param args     string raw args "<to> <amount>"
+function ServerProtocol:onChatTransfer(username, args)
+    if not utils.isNonEmptyString(args) then
+        Toast.sendMessage(username, "Usage: bank transfer <player> <amount>")
+        return
+    end
+
+    local to, amountStr = args:match("^%s*(%S+)%s+(%S+)%s*$")
+    local amount = amountStr and tonumber(amountStr)
+    if not to or not amount or amount <= 0 then
+        Toast.sendMessage(username, "Usage: bank transfer <player> <amount>")
+        return
+    end
+
+    local db = require "server.database"
+    local acct = db.getAccount(username)
+    if not acct then
+        Toast.sendMessage(username, "You don't have a BlockBank account yet.")
+        print("[SRV][CHAT] transfer refused for " .. tostring(username) .. ": no account")
+        return
+    end
+
+    local authResult = {
+        account = acct,
+        permission = acct.permission or constants.PERMISSION.USER,
+    }
+
+    local ok, result = Transactions.transfer({
+        from = username,
+        to = to,
+        amount = amount,
+    }, authResult)
+
+    if not ok then
+        local code = result
+        local friendly
+        if code == constants.ERROR.INSUFFICIENT_FUNDS then
+            friendly = "Insufficient funds for that transfer."
+        elseif code == constants.ERROR.DESTINATION_NO_ACCOUNT then
+            friendly = "'" .. tostring(to) .. "' does not have a BlockBank account."
+        elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
+            friendly = "Your account was not found."
+        elseif code == constants.ERROR.INVALID_PACKET then
+            friendly = "Invalid transfer. Usage: bank transfer <player> <amount>"
+        else
+            friendly = "Transfer failed: " .. tostring(code)
+        end
+        Toast.sendMessage(username, friendly)
+        print(("[SRV][CHAT] transfer failed for %s -> %s amount=%s: %s"):format(
+            tostring(username), tostring(to), tostring(amount), tostring(code)))
+        return
+    end
+
+    print(("[SRV][CHAT] transfer %s -> %s amount=%s ok (fromBalance=%s)"):format(
+        tostring(username), tostring(to), tostring(amount),
+        tostring(result and result.fromBalance or "?")))
+    -- Success toasts (recipient + sender) and chat receipts are sent inside Transactions.transfer
+end
+
+--- Handle "$bank list" - show the top 10 accounts by balance
+--- @param username string the player who sent the chat
+function ServerProtocol:onChatList(username)
+    local db = require "server.database"
+    local accounts = db.listAccounts()
+    table.sort(accounts, function(a, b)
+        return (a.balance or 0) > (b.balance or 0)
+    end)
+
+    local topN = math.min(10, #accounts)
+    print(("[SRV][CHAT] list requested by %s (accounts=%d)"):format(tostring(username), #accounts))
+
+    if topN == 0 then
+        Toast.sendMessage(username, "No accounts yet.")
+        return
+    end
+
+    local lines = {}
+    for i = 1, topN do
+        local acct = accounts[i]
+        lines[#lines + 1] = ("%d. %s - $%.2f"):format(i, tostring(acct.username), acct.balance or 0)
+    end
+
+    Toast.sendMessage(username, table.concat(lines, "\n"))
+end
+
+--- Handle "$bank balance" - show the sender's balance in chat
+--- @param username string the player who sent the chat
+function ServerProtocol:onChatBalance(username)
+    local db = require "server.database"
+    local acct = db.getAccount(username)
+    if not acct then
+        Toast.sendMessage(username, "You don't have a BlockBank account yet.")
+        print("[SRV][CHAT] balance refused for " .. tostring(username) .. ": no account")
+        return
+    end
+
+    Toast.sendMessage(username, ("Your balance is $%.2f"):format(acct.balance or 0))
+    print(("[SRV][CHAT] balance for %s = %s"):format(tostring(username), tostring(acct.balance or 0)))
+end
+
 --- Evict expired pending logins
 function ServerProtocol:_evictExpiredLogins()
     local cutoff = utils.now() - constants.LOGIN_CHAT_TIMEOUT_MS

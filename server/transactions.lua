@@ -352,7 +352,7 @@ function Transactions.transfer(payload, authResult)
 
     local toAcct = db.getAccount(payload.to)
     if not toAcct then
-        return false, constants.ERROR.ACCOUNT_NOT_FOUND
+        return false, constants.ERROR.DESTINATION_NO_ACCOUNT
     end
 
     if fromAcct.balance < payload.amount then
@@ -377,6 +377,10 @@ function Transactions.transfer(payload, authResult)
     -- Toast notifications
     Toast.notify(payload.to, ("You received %d from %s"):format(payload.amount, payload.from))
     Toast.success(payload.from, ("Transfer of %d to %s successful"):format(payload.amount, payload.to))
+
+    -- Chat receipts for tracking
+    Toast.sendMessage(payload.to, ("Received $%.2f from %s"):format(payload.amount, payload.from))
+    Toast.sendMessage(payload.from, ("Sent $%.2f successfully to %s"):format(payload.amount, payload.to))
 
     return true, {
         fromBalance = fromAcct.balance,
