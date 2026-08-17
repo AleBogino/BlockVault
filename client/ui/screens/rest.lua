@@ -79,7 +79,6 @@ local function drawLoginWait(state, loginCode, flags)
     -- Split the command so the 4-char code is never clipped on narrow screens
     local cmdPrefix = "$.bvault login"
     mon.setTextColor(colors.green)
-    mon.setBackgroundColor(colors.white)
     mon.setCursorPos(Draw.centerCol(lay, cmdPrefix), 7)
     mon.write(cmdPrefix)
 
