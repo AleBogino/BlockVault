@@ -4,9 +4,12 @@ if not package.path:find("^/%?%.lua;", 1) then
     package.path = "/?.lua;/?/init.lua;" .. package.path
 end
 
+local Peripheral = require "shared.peripheral"
+
 local M = {}
 
 M.box = nil
+M.warned = false
 
 local DEFAULTS = {
     prefix   = "Bank",
@@ -41,15 +44,10 @@ end
 --- @return table|nil box
 --- @return string|nil side
 function M.find()
-    for _, side in ipairs(peripheral.getNames()) do
-        local t = peripheral.getType(side)
-        if t then
-            local lt = string.lower(t)
-            if lt == "chat_box" or lt == "chatbox"
-                or lt:find(":chat_box", 1, true) or lt:find(":chatbox", 1, true) then
-                return peripheral.wrap(side), side
-            end
-        end
+    local cat = Peripheral.scan()
+    local name = Peripheral.first(cat.chatBoxes)
+    if name then
+        return peripheral.wrap(name), name
     end
     return nil, nil
 end
@@ -63,6 +61,10 @@ function M.ready()
     end
     M.box = M.find()
     if not M.box then
+        if not M.warned then
+            print("[TOAST] WARNING: no chat_box peripheral found - toasts disabled")
+            M.warned = true
+        end
         return false, "no chat_box peripheral attached"
     end
     return true
@@ -96,17 +98,21 @@ function M.send(player, title, message, options)
     }
     local method = M.box.sendToast or M.box.sendToastToPlayer
     if not method then
+        print("[TOAST] ERROR: chat box does not support sendToast")
         return nil, "chat box does not support sendToast"
     end
 
     local called, result, callErr = pcall(method, M.box, payload)
     if not called then
+        print("[TOAST] send error for " .. tostring(player) .. ": " .. tostring(result))
         return nil, tostring(result)
     end
     if result == true then
         return true
     end
-    return nil, tostring(callErr or result or "toast send failed")
+    local errMsg = tostring(callErr or result or "toast send failed")
+    print("[TOAST] send failed for " .. tostring(player) .. ": " .. errMsg)
+    return nil, errMsg
 end
 
 --- Send a toast with title and message
@@ -143,12 +149,15 @@ function M.sendFormatted(player, title, message, options)
 
     local called, result, callErr = pcall(method, M.box, payload)
     if not called then
+        print("[TOAST] formatted send error for " .. tostring(player) .. ": " .. tostring(result))
         return nil, tostring(result)
     end
     if result == true then
         return true
     end
-    return nil, tostring(callErr or result or "formatted toast send failed")
+    local errMsg = tostring(callErr or result or "formatted toast send failed")
+    print("[TOAST] formatted send failed for " .. tostring(player) .. ": " .. errMsg)
+    return nil, errMsg
 end
 
 -- ---------------------------- convenience wrappers ---------------------------- --

@@ -60,6 +60,13 @@ local function classify(cat, name, viaModem)
     if isInventory(name, viaModem) then
         table.insert(cat.inventories, name)
     end
+    for _, t in ipairs(getTypes(name, viaModem)) do
+        local lt = string.lower(t)
+        if lt == "chat_box" or lt == "chatbox" then
+            table.insert(cat.chatBoxes, name)
+            break
+        end
+    end
 
     return true
 end
@@ -75,6 +82,7 @@ function Peripheral.scan()
         wireless    = {},
         wired       = {},
         monitors    = {},
+        chatBoxes   = {},
         seen        = {},
     }
     local modemQueue = {}
@@ -112,6 +120,16 @@ end
 function Peripheral.pickModem(cat)
     if cat and cat.wireless and #cat.wireless > 0 then
         return cat.wireless[1]
+    end
+    return nil
+end
+
+--- Pick the first chat box name
+--- @param cat table result from Peripheral.scan()
+--- @return string|nil chat box name
+function Peripheral.pickChatBox(cat)
+    if cat and cat.chatBoxes and #cat.chatBoxes > 0 then
+        return cat.chatBoxes[1]
     end
     return nil
 end

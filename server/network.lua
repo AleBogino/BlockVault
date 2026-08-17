@@ -61,15 +61,10 @@ end
 --- @return table|nil chatBox the wrapped peripheral
 --- @return string|nil side
 local function findChatBox()
-    for _, side in ipairs(peripheral.getNames()) do
-        local t = peripheral.getType(side)
-        if t then
-            local lt = string.lower(t)
-            if lt == "chat_box" or lt == "chatbox"
-                or lt:find(":chat_box", 1, true) or lt:find(":chatbox", 1, true) then
-                return peripheral.wrap(side), side
-            end
-        end
+    local cat = Peripheral.scan()
+    local name = Peripheral.first(cat.chatBoxes)
+    if name then
+        return peripheral.wrap(name), name
     end
     return nil, nil
 end
