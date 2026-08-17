@@ -14,6 +14,8 @@ local Transfer = {}
 
 local MAX_PLAYERS_PER_PAGE = 6
 
+local drawConfirmStage
+
 --- Draw the amount entry step
 --- @param state     table shared state
 --- @param acct      table current user account
@@ -49,44 +51,75 @@ local function drawAmountStage(state, acct, recipient, message)
                 return
             end
 
-            local payload, err = Net.sendAndReceive(state, constants.PACKET.TRANSFER, {
-                from = acct.username,
-                to = recipient,
-                amount = amount
-            })
-
-            if not payload then
-                drawAmountStage(state, acct, recipient, "Network error: " .. tostring(err))
-                return
-            end
-
-            if not payload.success then
-                local code = payload.code or "UNKNOWN"
-                local friendly
-                if code == constants.ERROR.INSUFFICIENT_FUNDS then
-                    friendly = "Insufficient funds."
-                elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
-                    friendly = "Recipient '" .. recipient .. "' does not have a BlockBank account."
-                elseif code == constants.ERROR.PERMISSION_DENIED then
-                    friendly = "You can only transfer from your own account."
-                else
-                    friendly = "Error: " .. code
-                end
-                drawAmountStage(state, acct, recipient, friendly)
-                return
-            end
-
-            -- Success
-            acct.balance = payload.data.fromBalance
-            local successMsg = "Sent $" .. tostring(amount) .. " to " .. recipient .. ". New balance: $" ..
-                                   tostring(payload.data.fromBalance)
-            Router.switch(MainMenu, acct, successMsg)
+            drawConfirmStage(state, acct, recipient, amount)
         end,
         onCancel = function()
-            -- Go back to recipient selection
+            -- Go back to recipient
             Transfer.draw(state, acct)
         end
     })
+end
+
+--- Draw the confirmation step
+--- @param state     table shared state
+--- @param acct      table current user account
+--- @param recipient string target username
+--- @param amount    number amount to send
+drawConfirmStage = function(state, acct, recipient, amount)
+    local mon = state.monitor
+    local lay = state.layout
+
+    Draw.clear(mon)
+
+    Draw.header(mon, lay, "Confirm Transfer")
+
+    local y = lay.headerRow + 1
+    mon.setTextColor(colors.white)
+    y = TextWrap.write(mon, "Send to: " .. recipient, 3, y)
+    y = TextWrap.write(mon, "Amount: $" .. string.format("%.2f", amount), 3, y)
+
+    mon.setTextColor(colors.lime)
+    y = TextWrap.write(mon, "Balance after: $" .. string.format("%.2f", (acct.balance or 0) - amount), 3, y)
+
+    local confirmCb = function()
+        local payload, err = Net.sendAndReceive(state, constants.PACKET.TRANSFER, {
+            from = acct.username,
+            to = recipient,
+            amount = amount
+        })
+
+        if not payload then
+            drawAmountStage(state, acct, recipient, "Network error: " .. tostring(err))
+            return
+        end
+
+        if not payload.success then
+            local code = payload.code or "UNKNOWN"
+            local friendly
+            if code == constants.ERROR.INSUFFICIENT_FUNDS then
+                friendly = "Insufficient funds."
+            elseif code == constants.ERROR.ACCOUNT_NOT_FOUND then
+                friendly = "Recipient '" .. recipient .. "' does not have a BlockBank account."
+            elseif code == constants.ERROR.PERMISSION_DENIED then
+                friendly = "You can only transfer from your own account."
+            else
+                friendly = "Error: " .. code
+            end
+            drawAmountStage(state, acct, recipient, friendly)
+            return
+        end
+
+        -- Success
+        acct.balance = payload.data.fromBalance
+        local successMsg = "Sent $" .. tostring(amount) .. " to " .. recipient .. ". New balance: $" ..
+                               tostring(payload.data.fromBalance)
+        Router.switch(MainMenu, acct, successMsg)
+    end
+
+    Draw.confirmCancelRow(mon, lay, confirmCb, function()
+        -- Go back to the amount entry
+        drawAmountStage(state, acct, recipient)
+    end, "  Confirm  ", "  Cancel  ")
 end
 
 --- u know it, draw it!
