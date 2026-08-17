@@ -87,22 +87,35 @@ function M.send(player, title, message, options)
     end
 
     options = options or {}
-    local payload = {
-        player       = player,
-        title        = title or DEFAULTS.prefix,
-        message      = message or "",
-        utf8         = options.utf8,
-        prefix       = options.prefix or DEFAULTS.prefix,
-        brackets     = options.brackets or DEFAULTS.brackets,
-        bracketColor = options.bracketColor,
-    }
-    local method = M.box.sendToast or M.box.sendToastToPlayer
-    if not method then
+    title = title or DEFAULTS.prefix
+    message = message or ""
+
+    local called, result, callErr
+    if M.box.sendToast then
+        -- sendToast({ player, title, message, ... })
+        called, result, callErr = pcall(M.box.sendToast, {
+            player       = player,
+            title        = title,
+            message      = message,
+            utf8         = options.utf8,
+            prefix       = options.prefix or DEFAULTS.prefix,
+            brackets     = options.brackets or DEFAULTS.brackets,
+            bracketColor = options.bracketColor,
+        })
+    elseif M.box.sendToastToPlayer then
+        -- sendToastToPlayer(message, title, username, prefix, brackets, bracketColor)
+        called, result, callErr = pcall(M.box.sendToastToPlayer,
+            message,
+            title,
+            player,
+            options.prefix or DEFAULTS.prefix,
+            options.brackets or DEFAULTS.brackets,
+            options.bracketColor)
+    else
         print("[TOAST] ERROR: chat box does not support sendToast")
         return nil, "chat box does not support sendToast"
     end
 
-    local called, result, callErr = pcall(method, M.box, payload)
     if not called then
         print("[TOAST] send error for " .. tostring(player) .. ": " .. tostring(result))
         return nil, tostring(result)
@@ -132,22 +145,35 @@ function M.sendFormatted(player, title, message, options)
     end
 
     options = options or {}
-    local payload = {
-        player       = player,
-        title        = toJson(title),
-        message      = toJson(message),
-        utf8         = options.utf8,
-        prefix       = options.prefix or DEFAULTS.prefix,
-        brackets     = options.brackets or DEFAULTS.brackets,
-        bracketColor = options.bracketColor,
-    }
+    local titleJson = toJson(title)
+    local messageJson = toJson(message)
 
-    local method = M.box.sendFormattedToast or M.box.sendFormattedToastToPlayer
-    if not method then
+    local called, result, callErr
+    if M.box.sendFormattedToast then
+        -- sendFormattedToast({ player, title, message, ... })
+        called, result, callErr = pcall(M.box.sendFormattedToast, {
+            player       = player,
+            title        = titleJson,
+            message      = messageJson,
+            utf8         = options.utf8,
+            prefix       = options.prefix or DEFAULTS.prefix,
+            brackets     = options.brackets or DEFAULTS.brackets,
+            bracketColor = options.bracketColor,
+        })
+    elseif M.box.sendFormattedToastToPlayer then
+        -- sendFormattedToastToPlayer(messageJson, titleJson, username, prefix, brackets, bracketColor)
+        called, result, callErr = pcall(M.box.sendFormattedToastToPlayer,
+            messageJson,
+            titleJson,
+            player,
+            options.prefix or DEFAULTS.prefix,
+            options.brackets or DEFAULTS.brackets,
+            options.bracketColor)
+    else
+        print("[TOAST] ERROR: chat box does not support sendFormattedToast")
         return nil, "chat box does not support sendFormattedToast"
     end
 
-    local called, result, callErr = pcall(method, M.box, payload)
     if not called then
         print("[TOAST] formatted send error for " .. tostring(player) .. ": " .. tostring(result))
         return nil, tostring(result)
