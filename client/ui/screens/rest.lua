@@ -77,9 +77,9 @@ local function drawLoginWait(state, loginCode, flags)
     mon.write(instruction)
 
     -- Split the command so the 4-char code is never clipped on narrow screens
-    local cmdPrefix = ".bvault login"
+    local cmdPrefix = "$.bvault login"
     mon.setTextColor(colors.green)
-    mon.setBackgroundColor(colors.gray)
+    mon.setBackgroundColor(colors.white)
     mon.setCursorPos(Draw.centerCol(lay, cmdPrefix), 7)
     mon.write(cmdPrefix)
 
@@ -91,7 +91,7 @@ local function drawLoginWait(state, loginCode, flags)
     Draw.writeCentered(mon, lay, "Waiting for chat", 10)
 
     ScreenManager.reset()
-    Draw.centeredButton(mon, lay, "  Cancel  ", 12, 9, 2, function()
+    Draw.centeredButton(mon, lay, "  Cancel  ", 15, 9, 3, function()
         flags.cancelled = true
     end, { bg = colors.gray, fg = colors.white })
 end
