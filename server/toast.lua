@@ -184,7 +184,23 @@ local function dispatchFormatted(player, titleJson, messageJson, options)
     return nil, errMsg
 end
 
---- peripheral call for a plain chat message (optionally private to a player)
+--- Build chat options table
+--- @param player  string|nil
+--- @param options table { prefix=, brackets=, bracketColor=, utf8= }
+local function chatOptions(player, options)
+    local opts = {
+        utf8         = options.utf8,
+        prefix       = options.prefix or DEFAULTS.prefix,
+        brackets     = options.brackets or DEFAULTS.brackets,
+        bracketColor = options.bracketColor,
+    }
+    if player and player ~= "" then
+        opts.player = player
+    end
+    return opts
+end
+
+--- peripheral call for a plain chat message
 --- @param player  string|nil player name/uuid, nil broadcasts to everyone
 --- @param message string  chat message
 --- @param options table { prefix=, brackets=, bracketColor=, utf8= }
@@ -195,17 +211,23 @@ local function dispatchChat(player, message, options)
 
     M.lastSentAt = os.epoch("utc")
 
-    local opts = {
-        utf8         = options.utf8,
-        prefix       = options.prefix or DEFAULTS.prefix,
-        brackets     = options.brackets or DEFAULTS.brackets,
-        bracketColor = options.bracketColor,
-    }
+    local called, result, callErr
     if player and player ~= "" then
-        opts.player = player
+        if M.box.sendMessageToPlayer then
+            -- positional private: sendMessageToPlayer(message, player)
+            called, result, callErr = pcall(M.box.sendMessageToPlayer, message, player)
+        else
+            -- positional: sendMessage(message, player)
+            called, result, callErr = pcall(M.box.sendMessage, message, player)
+            if not called then
+                called, result, callErr = pcall(M.box.sendMessage, message, chatOptions(player, options))
+            end
+        end
+    else
+        -- broadcast to everyone
+        called, result, callErr = pcall(M.box.sendMessage, message)
     end
 
-    local called, result, callErr = pcall(M.box.sendMessage, message, opts)
     if not called then
         print("[TOAST] chat send error for " .. tostring(player) .. ": " .. tostring(result))
         return nil, tostring(result)
@@ -218,7 +240,7 @@ local function dispatchChat(player, message, options)
     return nil, errMsg
 end
 
---- peripheral call for a formatted chat message (optionally private to a player)
+--- peripheral call for a formatted chat message
 --- @param player      string|nil player name/uuid, nil broadcasts to everyone
 --- @param messageJson string|nil  JSON text component
 --- @param options     table { prefix=, brackets=, bracketColor=, utf8= }
@@ -229,17 +251,24 @@ local function dispatchChatFormatted(player, messageJson, options)
 
     M.lastSentAt = os.epoch("utc")
 
-    local opts = {
-        utf8         = options.utf8,
-        prefix       = options.prefix or DEFAULTS.prefix,
-        brackets     = options.brackets or DEFAULTS.brackets,
-        bracketColor = options.bracketColor,
-    }
+    local called, result, callErr
     if player and player ~= "" then
-        opts.player = player
+        if M.box.sendFormattedMessageToPlayer then
+            -- positional private: sendFormattedMessageToPlayer(json, player)
+            called, result, callErr = pcall(M.box.sendFormattedMessageToPlayer, messageJson, player)
+        else
+            -- positional: sendFormattedMessage(json, player)
+            called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, player)
+            if not called then
+                -- fallback
+                called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, chatOptions(player, options))
+            end
+        end
+    else
+        -- broadcast to everyone
+        called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson)
     end
 
-    local called, result, callErr = pcall(M.box.sendFormattedMessage, messageJson, opts)
     if not called then
         print("[TOAST] formatted chat send error for " .. tostring(player) .. ": " .. tostring(result))
         return nil, tostring(result)
