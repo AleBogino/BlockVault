@@ -7,6 +7,7 @@ end
 local utils = require "shared.utils"
 
 local AUDIT_FILE = "data/audit.log"
+local MAX_LOG_SIZE = 512 * 1024 -- bytes
 
 local Logger = {}
 
@@ -14,6 +15,23 @@ local function ensureDir()
     if not fs.exists("data") then
         fs.makeDir("data")
     end
+end
+
+--- Rotate the audit log once it exceeds MAX_LOG_SIZE.
+local function rotateIfNeeded()
+    local ok, size = pcall(fs.getSize, AUDIT_FILE)
+    if not ok or type(size) ~= "number" then
+        return
+    end
+    if size <= MAX_LOG_SIZE then
+        return
+    end
+
+    local oldPath = AUDIT_FILE .. ".old"
+    if fs.exists(oldPath) then
+        pcall(fs.delete, oldPath)
+    end
+    pcall(fs.move, AUDIT_FILE, oldPath)
 end
 
 
@@ -31,9 +49,15 @@ function Logger.log(success, packetType, senderId, username, details)
         success    = success,
         type       = packetType,
         sender     = senderId,
-        username   = username or "<unknown>",
-        details    = details or "",
     }
+
+    -- Only include fields that actually carry information
+    if username ~= nil and username ~= "" then
+        entry.username = username
+    end
+    if details ~= nil and details ~= "" and details ~= "ok" then
+        entry.details = details
+    end
 
     local ok, line = pcall(textutils.serialize, entry, { compact = true })
     if not ok then
@@ -46,6 +70,8 @@ function Logger.log(success, packetType, senderId, username, details)
     end
     f.write(line .. "\n")
     f.close()
+
+    rotateIfNeeded()
 end
 
 --- Read the last N entries from the audit log

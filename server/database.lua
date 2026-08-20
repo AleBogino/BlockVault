@@ -7,6 +7,7 @@ local DATA_DIR = "data"
 local ACCOUNTS_FILE = "data/accounts.db"
 local TRANSACTIONS_FILE = "data/transactions.db"
 local KEYS_FILE = "data/keys.db"
+local MAX_TRANSACTIONS_SIZE = 512 * 1024 -- bytes
 
 -- --------------------------------- Helpers -------------------------------- --
 local function ensureDataDir()
@@ -22,6 +23,23 @@ local function cleanupTmpFiles()
             fs.delete(tmpPath)
         end
     end
+end
+
+--- Rotate the transaction log once it exceeds MAX_TRANSACTIONS_SIZE.
+local function rotateTransactionsIfNeeded()
+    local ok, size = pcall(fs.getSize, TRANSACTIONS_FILE)
+    if not ok or type(size) ~= "number" then
+        return
+    end
+    if size <= MAX_TRANSACTIONS_SIZE then
+        return
+    end
+
+    local oldPath = TRANSACTIONS_FILE .. ".old"
+    if fs.exists(oldPath) then
+        pcall(fs.delete, oldPath)
+    end
+    pcall(fs.move, TRANSACTIONS_FILE, oldPath)
 end
 
 --- Read table
@@ -315,6 +333,8 @@ function M.appendTransaction(tx)
     end
     f.write(line .. "\n")
     f.close()
+
+    rotateTransactionsIfNeeded()
 
     return true
 end
