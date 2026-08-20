@@ -204,6 +204,12 @@ end
 function ServerProtocol:_handleLoginRequest(senderId, pkt, send)
     print("[SRV] LOGIN_REQUEST from " .. tostring(senderId))
 
+    if not self.sessions[senderId] then
+        print("[SRV] LOGIN_REQUEST from " .. tostring(senderId) .. " but no active session - sending AUTH_FAILED")
+        send(senderId, self:_errorPacket(constants.ERROR.AUTH_FAILED))
+        return
+    end
+
     -- already pending login?
     for code, entry in pairs(self.pendingLogins) do
         if entry.senderId == senderId then
@@ -258,6 +264,7 @@ function ServerProtocol:completeChatLogin(username, code)
     if not session then
         print("[SRV] No active session for client " .. tostring(senderId))
         Toast.error(username, "Login session expired. Please start login again.")
+        rednet.send(senderId, self:_errorPacket(constants.ERROR.AUTH_FAILED), "ccbank")
         return
     end
 

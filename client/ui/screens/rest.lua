@@ -95,19 +95,15 @@ local function drawLoginWait(state, loginCode, flags)
     end, { bg = colors.gray, fg = colors.white })
 end
 
---- Initiate the chat-based login flow
 --- @param state table shared state
-function Rest.startLogin(state)
-    -- Step 1: Send LOGIN_REQUEST
-    Rest.draw(state, "Connecting to server...")
-
+--- @return string|nil loginCode
+--- @return string|nil errorMessage
+local function requestLoginCode(state)
     local session = state.clientProtocol.session
     if not session then
-        -- No session, need to reconnect first
         local connected, err = state.connect()
         if not connected then
-            Rest.draw(state, "Connection failed: " .. tostring(err))
-            return
+            return nil, "Connection failed: " .. tostring(err)
         end
         session = state.clientProtocol.session
     end
@@ -115,22 +111,57 @@ function Rest.startLogin(state)
     local loginPkt = state.clientProtocol:sendLoginRequest()
     state.network.send(state.serverId, loginPkt)
 
-    -- Step 2: Wait for LOGIN_AWAIT_CHAT with the code
     local reply = state.network.receiveOnce(10)
     if not reply then
-        Rest.draw(state, "No response from server. Try again.")
-        return
+        return nil, "No response from server. Try again."
     end
 
-    local _, loginCode, loginResult, accountData =
+    local _, loginCode, loginResult =
         state.clientProtocol:handleLoginPacket(reply)
 
+    if loginCode then
+        return loginCode, nil
+    end
+
+    if loginResult == "AUTH_FAILED" then
+        -- The server evicted our session. Drop it, reconnect, and retry once
+        state.clientProtocol.session = nil
+        state.clientProtocol.loginState = nil
+        Rest.draw(state, "Session expired. Reconnecting...")
+        local connected, err = state.connect()
+        if not connected then
+            return nil, "Connection failed: " .. tostring(err)
+        end
+
+        loginPkt = state.clientProtocol:sendLoginRequest()
+        state.network.send(state.serverId, loginPkt)
+        reply = state.network.receiveOnce(10)
+        if not reply then
+            return nil, "No response from server. Try again."
+        end
+        local _, retryCode = state.clientProtocol:handleLoginPacket(reply)
+        if retryCode then
+            return retryCode, nil
+        end
+        return nil, "Login error. Please try again."
+    end
+
+    return nil, "Login error. Please try again."
+end
+
+--- Initiate the chat-based login flow
+--- @param state table shared state
+function Rest.startLogin(state)
+    -- Step 1: Get a fresh login code (reconnecting if the session was evicted)
+    Rest.draw(state, "Connecting to server...")
+
+    local loginCode, err = requestLoginCode(state)
     if not loginCode then
-        Rest.draw(state, "Login error. Please try again.")
+        Rest.draw(state, err or "Login error. Please try again.")
         return
     end
 
-    -- Step 3: Display the code and wait for user to type it in chat
+    -- Step 2: Display the code and wait for user to type it in chat
     local flags = { cancelled = false }
     drawLoginWait(state, loginCode, flags)
 
@@ -165,6 +196,12 @@ function Rest.startLogin(state)
                     return
                 elseif result == "LOGIN_TIMEOUT" then
                     Rest.draw(state, "Timed out. Try again.")
+                    return
+                elseif result == "AUTH_FAILED" then
+                    -- Server evicted our session mid-login; restart the flow.
+                    state.clientProtocol.session = nil
+                    state.clientProtocol.loginState = nil
+                    Rest.startLogin(state)
                     return
                 end
             end

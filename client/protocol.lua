@@ -112,7 +112,7 @@ end
 --- @param pkt table the received packet
 --- @return table|nil replyPacket to send back
 --- @return string|nil loginCode if LOGIN_AWAIT_CHAT
---- @return string|nil result   "LOGGED_IN", "LOGIN_FAIL", "LOGIN_TIMEOUT", or nil (in progress)
+--- @return string|nil result   "LOGGED_IN", "LOGIN_FAIL", "LOGIN_TIMEOUT", "AUTH_FAILED", or nil (in progress)
 --- @return table|nil accountData if LOGGED_IN
 function ClientProtocol:handleLoginPacket(pkt)
     if tonumber(pkt.sender) ~= tonumber(self.serverId) then
@@ -129,7 +129,18 @@ function ClientProtocol:handleLoginPacket(pkt)
         return nil, pkt.payload.code, nil, nil
     end
 
+    -- Drop the stale session so the caller can reconnect.
+    if pkt.type == constants.PACKET.AUTH_FAIL or pkt.type == constants.PACKET.ERROR then
+        self.session = nil
+        self.loginState = nil
+        return nil, nil, "AUTH_FAILED", nil
+    end
+
     -- All other login packets are encrypted
+    if not self.session then
+        self.loginState = nil
+        return nil, nil, "AUTH_FAILED", nil
+    end
     local payload, rerr = self.session:receive(pkt)
     if not payload then
         return nil, nil, "LOGIN_FAIL", nil
