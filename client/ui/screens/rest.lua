@@ -18,6 +18,9 @@ local Rest = {}
 local LOGIN_TIMEOUT = 30
 local LOGIN_REDRAW_INTERVAL = 2
 
+-- How long a status message stays on screen before auto-clearing (seconds)
+local MESSAGE_CLEAR_DELAY = 4
+
 --- Draw da screen
 --- @param state table shared state
 --- @param message? string optional status/error message
@@ -54,6 +57,28 @@ function Rest.draw(state, message)
     Draw.centeredButton(mon, lay, "  Start  ", 14, 11, 3, function()
         Rest.startLogin(state)
     end, { bg = colors.blue, fg = colors.white })
+end
+
+--- Draw a status message, then clear it and return to the default Start
+--- screen after a short delay (or immediately if a button is tapped).
+--- @param state table shared state
+--- @param message string the message to show
+--- @param clearDelay? number seconds before clearing (default MESSAGE_CLEAR_DELAY)
+function Rest.showMessage(state, message, clearDelay)
+    Rest.draw(state, message)
+
+    local clearTimer = os.startTimer(clearDelay or MESSAGE_CLEAR_DELAY)
+    while true do
+        local event, p1, p2, p3 = os.pullEvent()
+        if event == "timer" and p1 == clearTimer then
+            Rest.draw(state)
+            return
+        elseif event == "monitor_touch" then
+            if ScreenManager.dispatch(p2, p3) then
+                return
+            end
+        end
+    end
 end
 
 --- Draw the "wait for chat login" screen
@@ -157,7 +182,7 @@ function Rest.startLogin(state)
 
     local loginCode, err = requestLoginCode(state)
     if not loginCode then
-        Rest.draw(state, err or "Login error. Please try again.")
+        Rest.showMessage(state, err or "Login error. Please try again.")
         return
     end
 
@@ -187,15 +212,15 @@ function Rest.startLogin(state)
                     elseif data and data.newAccount then
                         Rest.drawCreateAccountPrompt(state, data.username)
                     else
-                        Rest.draw(state, "Invalid account data received.")
+                        Rest.showMessage(state, "Invalid account data received.")
                     end
                     return
                 elseif result == "LOGIN_FAIL" then
                     local reason = data and data.reason or "Unknown error"
-                    Rest.draw(state, "Login failed: " .. reason)
+                    Rest.showMessage(state, "Login failed: " .. reason)
                     return
                 elseif result == "LOGIN_TIMEOUT" then
-                    Rest.draw(state, "Timed out. Try again.")
+                    Rest.showMessage(state, "Timed out. Try again.")
                     return
                 elseif result == "AUTH_FAILED" then
                     -- Server evicted our session mid-login; restart the flow.
@@ -207,7 +232,7 @@ function Rest.startLogin(state)
             end
 
         elseif event == "timer" and p1 == loginTimer then
-            Rest.draw(state, "Timed out. Try again.")
+            Rest.showMessage(state, "Timed out. Try again.")
             return
 
         elseif event == "timer" and p1 == redrawTimer then
@@ -222,7 +247,7 @@ function Rest.startLogin(state)
         end
     end
 
-    Rest.draw(state, "Login cancelled.")
+    Rest.showMessage(state, "Login cancelled.")
 end
 
 --- Prompt to create a new account
@@ -250,24 +275,24 @@ function Rest.drawCreateAccountPrompt(state, username)
                 initialBalance = 100,
             })
             if not payload then
-                Rest.draw(state, "Error: " .. tostring(err))
+                Rest.showMessage(state, "Error: " .. tostring(err))
             elseif not payload.success then
                 local code = payload.code or "UNKNOWN"
                 if code == "USERNAME_TAKEN" then
-                    Rest.draw(state, "Username '" .. username .. "' is already taken.")
+                    Rest.showMessage(state, "Username '" .. username .. "' is already taken.")
                 elseif code == "ALREADY_HAS_ACCOUNT" then
                     Rest.draw(state, "You already have an account.")
                     local p2, e2 = Net.sendAndReceive(state, constants.PACKET.GET_ACCOUNT, { username = username })
                     if p2 and p2.success then
                         Router.switch(MainMenu, p2.data)
                     else
-                        Rest.draw(state, "Login failed: " .. tostring(e2 or (p2 and p2.code)))
+                        Rest.showMessage(state, "Login failed: " .. tostring(e2 or (p2 and p2.code)))
                     end
                 else
-                    Rest.draw(state, "Server error: " .. code)
+                    Rest.showMessage(state, "Server error: " .. code)
                 end
             else
-                Rest.draw(state, "Account created! Tap Start to log in.")
+                Rest.showMessage(state, "Account created! Tap Start to log in.")
             end
         end, { bg = colors.green, fg = colors.white })
 
